@@ -11,9 +11,9 @@ request and writes the raw bytes straight to the printer's character device. See
 the top-level [README](../README.md) for the Apps Script side.
 
 > **Secrets are redacted here on purpose.** Placeholders like `<NGROK_USER>` /
-> `<NGROK_PASS>` stand in for real values, which live in the password manager and
-> in Apps Script **Script Properties** — never in this repo. Don't paste real
-> credentials into this file.
+> `<NGROK_PASS>` / `<NGROK_DOMAIN>` stand in for real values, which live in the
+> password manager and in Apps Script **Script Properties** — never in this repo.
+> Don't paste real credentials or hostnames into this file.
 
 ---
 
@@ -55,7 +55,7 @@ secrets themselves.
 
 The ngrok basic-auth pair on the Pi (`start_print_system.sh`) must match
 `NGROK_USER` / `NGROK_PASS` in Script Properties exactly. The static ngrok
-domain is `redacted.ngrok.app`.
+domain is `<NGROK_DOMAIN>`.
 
 ---
 
@@ -75,7 +75,7 @@ domain is `redacted.ngrok.app`.
 
   ```bash
   nohup ngrok http \
-    --domain=redacted.ngrok.app \
+    --domain=<NGROK_DOMAIN> \
     --basic-auth="<NGROK_USER>:<NGROK_PASS>" \
     127.0.0.1:8080 > /home/pi/printer_project/ngrok.log 2>&1 &
   ```
@@ -201,7 +201,7 @@ credentials with the real ngrok basic-auth values from the password manager.
 printf "\x1B\x40SYSTEM ONLINE\x0A\x0A\x0A\x1D\x56\x42\x00" \
   | curl -v -u "<NGROK_USER>:<NGROK_PASS>" \
       -X POST --data-binary @- \
-      https://redacted.ngrok.app
+      https://<NGROK_DOMAIN>
 ```
 
 A short "SYSTEM ONLINE" receipt should print and cut.

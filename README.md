@@ -71,21 +71,21 @@ then `npm run push`. The project is already bound via the committed
 No secrets live in the repo. Runtime config is read from **Script Properties**
 (Apps Script editor → Project Settings → Script Properties):
 
-| Property     | Used by  | What it is                                          |
-| ------------ | -------- | --------------------------------------------------- |
-| `PI_URL`     | both     | ngrok HTTPS URL of the Pi print bridge              |
-| `NGROK_USER` | both     | basic-auth username for the tunnel                  |
-| `NGROK_PASS` | both     | basic-auth password for the tunnel                  |
-| `GEMINI_KEY` | briefing | Google API key — Gemini **and** the Weather API     |
-| `NEWS_KEY`   | briefing | NewsAPI key (currently optional — news path is off) |
-| `LAT`        | briefing | latitude for weather                                |
-| `LON`        | briefing | longitude for weather                               |
+| Property          | Used by  | What it is                                          |
+| ----------------- | -------- | --------------------------------------------------- |
+| `PI_URL`          | both     | ngrok HTTPS URL of the Pi print bridge              |
+| `NGROK_USER`      | both     | basic-auth username for the tunnel                  |
+| `NGROK_PASS`      | both     | basic-auth password for the tunnel                  |
+| `CALENDAR_ID`     | calendar | which Google Calendar to print                      |
+| `EMAIL_ALERTS_TO` | calendar | where failure alerts are emailed                    |
+| `GEMINI_KEY`      | briefing | Google API key — Gemini **and** the Weather API     |
+| `NEWS_KEY`        | briefing | NewsAPI key (currently optional — news path is off) |
+| `LAT`             | briefing | latitude for weather                                |
+| `LON`             | briefing | longitude for weather                               |
 
-A couple of values are still hardcoded at the top of `src/calendar.ts` —
-`CALENDAR_ID` (which calendar to print) and `EMAIL_ALERTS_TO` (where failure
-alerts go). Two state keys are managed by the script itself and need no setup:
-`PRINT_MEMORY` (de-dupes already-printed events) and `LAST_ALERT_TIME` (rate-limits
-alert emails).
+Two state keys are managed by the script itself and need no setup:
+`PRINT_MEMORY` (de-dupes already-printed events) and `LAST_ALERT_TIME`
+(rate-limits alert emails).
 
 ## Local iteration
 

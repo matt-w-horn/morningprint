@@ -5,9 +5,9 @@
 import { CMD, stringToBytes } from './escpos';
 
 // --- CONFIGURATION ---
-const CALENDAR_ID =
-  'REDACTED_CALENDAR_ID';
-const EMAIL_ALERTS_TO = 'redacted@example.com';
+// CALENDAR_ID (which calendar to print) and EMAIL_ALERTS_TO (where failure alerts
+// go) are read from Script Properties at runtime — not hardcoded here, so no PII
+// lives in the repo. Set them in the Apps Script editor → Project Settings.
 const MAX_RETRIES = 3;
 
 // --- TIME WINDOW SETTINGS ---
@@ -37,6 +37,9 @@ export function checkAndPrintRobust(): void {
     const now = new Date();
     const scriptProperties = PropertiesService.getScriptProperties();
 
+    const calendarId = scriptProperties.getProperty('CALENDAR_ID');
+    if (!calendarId) throw new Error('Missing CALENDAR_ID in Script Properties');
+
     const memory = JSON.parse(
       scriptProperties.getProperty('PRINT_MEMORY') || '{"printedEventIds":[]}',
     );
@@ -47,7 +50,7 @@ export function checkAndPrintRobust(): void {
         ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
         : now;
 
-    const events = CalendarApp.getCalendarById(CALENDAR_ID)!.getEvents(
+    const events = CalendarApp.getCalendarById(calendarId)!.getEvents(
       timeWindowStart,
       timeWindowEnd,
     ) as unknown as ReceiptEvent[];
@@ -290,11 +293,16 @@ function callWithRetry(func: () => boolean): boolean | undefined {
 
 function sendAlertEmail(subject: string, body: string): void {
   const scriptProperties = PropertiesService.getScriptProperties();
+  const alertTo = scriptProperties.getProperty('EMAIL_ALERTS_TO');
+  if (!alertTo) {
+    Logger.log('⚠️ EMAIL_ALERTS_TO not set in Script Properties; skipping alert email.');
+    return;
+  }
   const lastAlert = parseInt(scriptProperties.getProperty('LAST_ALERT_TIME') || '0');
   const now = new Date().getTime();
   if (now - lastAlert > 14400000) {
     MailApp.sendEmail({
-      to: EMAIL_ALERTS_TO,
+      to: alertTo,
       subject: '⚠️ PRINTER ALERT: ' + subject,
       body: body,
     });

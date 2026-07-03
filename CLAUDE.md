@@ -74,11 +74,11 @@ build.js          esbuild bundle -> dist/main.gs; ENTRY_POINTS -> global footer
 
 ## Configuration & secrets
 
-All real secrets live in **Script Properties**, never in the repo: `PI_URL`,
-`NGROK_USER`, `NGROK_PASS`, `GEMINI_KEY` (used for both Gemini and the Google
-Weather API), `NEWS_KEY`, `LAT`, `LON`. Never hardcode these or log them.
-`CALENDAR_ID` and `EMAIL_ALERTS_TO` are consts at the top of `src/calendar.ts`.
-`PRINT_MEMORY` and `LAST_ALERT_TIME` are script-managed state keys.
+All real config/secrets live in **Script Properties**, never in the repo:
+`PI_URL`, `NGROK_USER`, `NGROK_PASS`, `GEMINI_KEY` (used for both Gemini and the
+Google Weather API), `NEWS_KEY`, `LAT`, `LON`, `CALENDAR_ID` (which calendar to
+print), and `EMAIL_ALERTS_TO` (where failure alerts go). Never hardcode these or
+log them. `PRINT_MEMORY` and `LAST_ALERT_TIME` are script-managed state keys.
 
 `.clasp.json` **is committed** here (it holds only the scriptId + push config, no
 credentials) so `git clone && npm run push` works. `.clasprc.json` (the OAuth
