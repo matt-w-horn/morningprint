@@ -88,7 +88,9 @@ All real config/secrets live in **Script Properties**, never in the repo:
 `GEMINI_KEY` (used for the Google Weather API and Gemini), `NEWS_KEY`, `LAT`,
 `LON`, `CALENDAR_ID` (which calendar to print), and `EMAIL_ALERTS_TO` (where
 failure alerts go). Never hardcode these or log them. `LAST_ART_DATE`,
-`PRINT_MEMORY`, and `LAST_ALERT_TIME` are script-managed state keys.
+`ART_HISTORY` (rolling list of recent pieces fed back into the art prompt for
+day-to-day variety), `PRINT_MEMORY`, and `LAST_ALERT_TIME` are script-managed
+state keys.
 
 `.clasp.json` **is committed** here (it holds only the scriptId + push config, no
 credentials) so `git clone && npm run push` works. `.clasprc.json` (the OAuth

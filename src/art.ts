@@ -48,8 +48,20 @@ export interface ArtOp {
 export interface ArtSpec {
   title: string;
   caption: string;
+  verse: string;
+  style: string; // archive note, not printed — feeds the day-to-day variety loop
   ops: ArtOp[];
 }
+
+// One line per recent piece, stored in the ART_HISTORY Script Property and fed
+// back into the prompt so consecutive days differ in subject and technique.
+export interface ArtHistoryEntry {
+  d: string; // yyyy-MM-dd
+  title: string;
+  style: string;
+}
+
+const HISTORY_LIMIT = 14;
 
 // JSON schema for output_config.format — structured-output rules apply:
 // additionalProperties:false on every object, no numeric min/max (the renderer
@@ -57,7 +69,7 @@ export interface ArtSpec {
 export const ART_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['title', 'caption', 'ops'],
+  required: ['title', 'caption', 'verse', 'style', 'ops'],
   properties: {
     title: {
       type: 'string',
@@ -66,8 +78,23 @@ export const ART_SCHEMA = {
     caption: {
       type: 'string',
       description:
-        'Gallery-placard caption printed under the piece: 1-2 short lines, ' +
-        `max ${COLS_A} characters per line. Wry or poetic; may nod to the theme source.`,
+        'One plain line naming the reference — the holiday, headline, weather ' +
+        'fact, or date the piece is about. The viewer should never have to ' +
+        `guess. Max ${COLS_A} characters.`,
+    },
+    verse: {
+      type: 'string',
+      description:
+        'A short poem printed beneath the artwork: 2-6 lines separated by \\n, ' +
+        `each max ${COLS_A} characters. Vary the form day to day — haiku, ` +
+        'couplet, free fragment, epigram. It should illuminate the piece.',
+    },
+    style: {
+      type: 'string',
+      description:
+        'Archive note, NOT printed: one line recording subject + visual ' +
+        'technique (e.g. "firework burst over skyline; dot-scatter + gapless ' +
+        'silhouette"). Used to avoid repeating yourself on future days.',
     },
     ops: {
       type: 'array',
@@ -152,9 +179,13 @@ CRAFT
 - The printer adds the date stamp above and your title + caption below the piece automatically. The ops are ONLY the artwork — no title block, no signature, no border unless it is part of the art.
 
 EACH DAY
-- You receive the date, season, and local weather, and may run a few brief web searches to feel the day (news mood, holidays, anniversaries, events). Searching is optional — skip it when the weather or season already gives you the piece.
-- Choose ONE evocative theme for today and commit to it. Vary radically from day to day: a landscape, a geometric abstraction, a pattern study, a giant-type poster, a tiny vignette, a weather glyph, a constellation map, a data-texture — never an obvious repeat of a recent idea.
-- Return title (punchy, UPPERCASE, ≤20 chars), caption (1-2 lines ≤${COLS_A} chars each, gallery-placard voice), and the ops.`;
+- You receive the date, season, local weather, and a list of your recent pieces, and may run a few brief web searches to feel the day (news mood, holidays, anniversaries, events). Searching is optional — skip it when the weather or season already gives you the piece.
+- Choose ONE evocative theme for today and commit to it. Your piece must differ SHARPLY from every recent piece listed in the context — different subject, different composition, different technique. Rotate across the whole space: landscape, geometric abstraction, pattern study, giant-type poster, tiny vignette, weather glyph, constellation map, data-texture, emblem, diagram, still life, architectural study.
+- Alongside the ops, return:
+  - title: punchy, UPPERCASE, ≤20 chars.
+  - verse: a short poem (2-6 lines, ≤${COLS_A} chars each) printed under the art. Vary the form daily — haiku, couplet, free fragment, epigram. It carries the feeling.
+  - caption: one plain line that names the reference outright (the holiday, the headline, the weather fact). The verse can be oblique; the caption may not — a viewer should read it and immediately know what the piece is about.
+  - style: an unprinted archive note — subject + technique in one line — so future-you avoids repeating it.`;
 
 // Build the user-turn context string. Pure — safe to call from the Node harness.
 export function buildArtContext(
@@ -162,6 +193,7 @@ export function buildArtContext(
   weather: WeatherData | null,
   lat: string | null,
   lon: string | null,
+  recent: ArtHistoryEntry[] = [],
 ): string {
   const dateStr = now.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -196,6 +228,14 @@ export function buildArtContext(
     );
   } else {
     lines.push('Local weather is unavailable today.');
+  }
+  if (recent.length > 0) {
+    lines.push('');
+    lines.push(
+      'Your recent pieces — today must differ sharply from ALL of these in ' +
+        'subject, composition, and technique:',
+    );
+    recent.forEach((r) => lines.push(`- ${r.d}: "${r.title}" — ${r.style}`));
   }
   lines.push('');
   lines.push("Design today's artwork now and return the art spec JSON.");
@@ -362,6 +402,17 @@ export function renderDailyArtReceipt(spec: ArtSpec, now: Date): number[] {
   p = p.concat(renderArtSpec(spec.ops));
   p = p.concat(CMD.FEED_LINES(1));
 
+  // The verse, centered and quiet, between the art and the placard.
+  const verse = String(spec.verse || '').trim();
+  if (verse.length > 0) {
+    verse.split('\n').forEach((line) => {
+      wrapText(line.trim(), COLS_A).forEach((l) => {
+        p = p.concat(encodeCP437(l), [0x0a]);
+      });
+    });
+    p = p.concat(CMD.FEED_LINES(1));
+  }
+
   // Gallery placard.
   p = p.concat(CMD.ALIGN_CENTER, encodeCP437('─'.repeat(COLS_A)), [0x0a]);
   p = p.concat(CMD.SIZE(2, 2), CMD.BOLD_ON);
@@ -421,6 +472,9 @@ export const GOLDEN_ART_SPEC: ArtSpec = (() => {
   return {
     title: 'GOLDEN RUN',
     caption: 'Test pattern: gradient, silhouette, invert, scale, texture.',
+    verse:
+      'The mountains hold their breath;\nthe sun tries every shade of gray\nbefore committing to gold.',
+    style: 'calibration plate; gradient + silhouette + type specimen',
     ops: [
       { text: '╔════════════╗\n║ TEST PLATE ║\n╚════════════╝', feedAfter: 1 },
       { text: sky, gapless: true },
@@ -531,11 +585,19 @@ export function printDailyArt(): void {
       }
     }
 
-    const context = buildArtContext(new Date(), weather, lat, lon);
+    // Recent pieces feed the prompt so consecutive days differ.
+    let history: ArtHistoryEntry[] = [];
+    try {
+      history = JSON.parse(props.getProperty('ART_HISTORY') || '[]');
+    } catch (e) {
+      Logger.log('⚠️ ART_HISTORY unreadable, starting fresh');
+    }
+
+    const context = buildArtContext(new Date(), weather, lat, lon, history);
     Logger.log('🖼️ Context:\n' + context);
 
     const spec = generateDailyArt(apiKey, context);
-    Logger.log(`🎨 "${spec.title}" — ${spec.ops.length} ops`);
+    Logger.log(`🎨 "${spec.title}" — ${spec.ops.length} ops — ${spec.style || ''}`);
 
     const payload = renderDailyArtReceipt(spec, new Date());
     if (DRY_RUN) {
@@ -547,6 +609,9 @@ export function printDailyArt(): void {
       throw new Error('Print failed after retries');
     }
     props.setProperty('LAST_ART_DATE', today);
+    history.push({ d: today, title: spec.title, style: spec.style || '' });
+    while (history.length > HISTORY_LIMIT) history.shift();
+    props.setProperty('ART_HISTORY', JSON.stringify(history));
     Logger.log('✅ Daily art printed.');
   } catch (e) {
     Logger.log('💥 [Daily Art Error] ' + e);
