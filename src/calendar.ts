@@ -50,41 +50,55 @@ export function checkAndPrintRobust(): void {
         ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
         : now;
 
-    const events = CalendarApp.getCalendarById(calendarId)!.getEvents(
+    const calendar = CalendarApp.getCalendarById(calendarId);
+    if (!calendar) {
+      throw new Error('Calendar not found — check the CALENDAR_ID Script Property');
+    }
+
+    const events = calendar.getEvents(
       timeWindowStart,
       timeWindowEnd,
     ) as unknown as ReceiptEvent[];
 
+    Logger.log(
+      `📅 Found ${events.length} event(s) in window ` +
+        `${timeWindowStart.toLocaleString()} → ${timeWindowEnd.toLocaleString()}`,
+    );
+
+    let printed = 0;
     events.forEach((event) => {
       const eventId = event.getId() + '_' + event.getStartTime().getTime();
-      if (memory.printedEventIds.includes(eventId)) return;
-
-      let shouldPrint = false;
-      const startTime = event.getStartTime();
-
-      if (event.isAllDayEvent()) {
-        shouldPrint = true;
-      } else {
-        if (startTime >= timeWindowStart && startTime <= timeWindowEnd) {
-          shouldPrint = true;
-        }
+      if (memory.printedEventIds.includes(eventId)) {
+        Logger.log(`⏭️ Skip (already printed): ${event.getTitle()}`);
+        return;
       }
 
-      if (shouldPrint) {
-        const binaryPayload = generateReceiptPayload(event);
-        const printSuccess = callWithRetry(() => sendToPi(binaryPayload));
+      const startTime = event.getStartTime();
+      const shouldPrint =
+        event.isAllDayEvent() ||
+        (startTime >= timeWindowStart && startTime <= timeWindowEnd);
 
-        if (printSuccess) {
-          Logger.log(`✅ Printed: ${event.getTitle()}`);
-          memory.printedEventIds.push(eventId);
-          if (memory.printedEventIds.length > 100) memory.printedEventIds.shift();
-          scriptProperties.setProperty('PRINT_MEMORY', JSON.stringify(memory));
-          Utilities.sleep(2000);
-        } else {
-          throw new Error(`Failed to print '${event.getTitle()}'`);
-        }
+      if (!shouldPrint) {
+        Logger.log(`⏭️ Skip (outside window): ${event.getTitle()}`);
+        return;
+      }
+
+      const binaryPayload = generateReceiptPayload(event);
+      const printSuccess = callWithRetry(() => sendToPi(binaryPayload));
+
+      if (printSuccess) {
+        Logger.log(`✅ Printed: ${event.getTitle()}`);
+        printed++;
+        memory.printedEventIds.push(eventId);
+        if (memory.printedEventIds.length > 100) memory.printedEventIds.shift();
+        scriptProperties.setProperty('PRINT_MEMORY', JSON.stringify(memory));
+        Utilities.sleep(2000);
+      } else {
+        throw new Error(`Failed to print '${event.getTitle()}'`);
       }
     });
+
+    Logger.log(`🏁 Done. Printed ${printed} new receipt(s).`);
   } catch (e) {
     Logger.log('💥 [Critical Error] ' + e.toString());
     sendAlertEmail('Printing Failed', e.toString());
