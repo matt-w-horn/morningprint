@@ -1,0 +1,14 @@
+# gitleaks config — keeps every built-in secret rule. All real secrets for this
+# project (GEMINI_KEY, NEWS_KEY, NGROK_USER/PASS, PI_URL, LAT/LON) live in Apps
+# Script Script Properties, never in the repo, so this is a backstop against an
+# accidental paste. https://github.com/gitleaks/gitleaks#configuration
+title = "receipt-printer"
+
+[extend]
+useDefault = true # built-in rules: Google API keys, generic high-entropy, etc.
+
+[allowlist]
+description = "Generated files"
+paths = [
+  '''package-lock\.json''',
+]

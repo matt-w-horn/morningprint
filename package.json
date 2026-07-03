@@ -1,0 +1,18 @@
+{
+  "name": "receipt-printer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Google Apps Script that prints calendar events and an AI morning briefing to a thermal receipt printer (via a Raspberry Pi behind an ngrok tunnel).",
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "status": "clasp status",
+    "push": "clasp push",
+    "pull": "clasp pull"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.3.0",
+    "prettier": "^3.8.4"
+  }
+}

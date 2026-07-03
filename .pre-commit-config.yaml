@@ -1,0 +1,13 @@
+# Optional local guard — catches secrets before they're committed (the cheapest
+# place to stop a leak). One-time setup:
+#
+#     brew install pre-commit       # or: pipx install pre-commit
+#     pre-commit install
+#
+# After that, gitleaks runs automatically on staged changes at every commit,
+# using the rules in .gitleaks.toml. Run on demand with: pre-commit run --all-files
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

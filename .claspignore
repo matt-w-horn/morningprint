@@ -1,0 +1,7 @@
+# clasp pushes from src/ (see .clasp.json "rootDir": "src"). Paths below are
+# resolved relative to that rootDir. Whitelist only the manifest and the Apps
+# Script source files; ignore anything else that lands in src/.
+**/**
+!appsscript.json
+!*.js
+!*.gs

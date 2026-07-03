@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+
+# clasp credentials — never commit. (.clasp.json IS committed here, on purpose:
+# it holds only the scriptId + push config, no secrets — see CLAUDE.md.)
+.clasprc.json
+
+# Logs / OS cruft
+*.log
+.DS_Store

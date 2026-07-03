@@ -1,0 +1,25 @@
+name: gitleaks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1' # weekly full-history sweep, Mondays 04:00 UTC
+
+permissions:
+  contents: read
+  pull-requests: read # gitleaks-action enumerates the PR's commits on pull_request events
+
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history so the scan covers every commit
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is only required for organization-owned repos, not personal ones.
