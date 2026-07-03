@@ -4,7 +4,7 @@ Guidance for Claude Code working in this repository.
 
 ## What this is
 
-**receipt-printer** turns a thermal receipt printer into a personal output
+**morningprint** turns a thermal receipt printer into a personal output
 device, driven by a standalone Google Apps Script (TypeScript, V8 runtime).
 One job: `printDailyArt()` in `src/art.ts` asks Claude Fable 5 (Anthropic API)
 to design an original piece of CP437 character art themed to the day (weather,

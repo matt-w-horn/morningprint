@@ -1,7 +1,7 @@
 # Direct-to-Metal Print Server Runbook
 
 **System:** Raspberry Pi Zero W + Epson TM-T20III
-**Role:** Secure, headless print server for the `receipt-printer` Apps Script job
+**Role:** Secure, headless print server for the `morningprint` Apps Script job
 (daily generative art).
 **Owner:** Matt Horn
 

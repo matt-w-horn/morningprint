@@ -1,8 +1,8 @@
 {
-  "name": "receipt-printer",
+  "name": "morningprint",
   "version": "0.1.0",
   "private": true,
-  "description": "Turn a thermal receipt printer into a personal output device — driven by Google Apps Script.",
+  "description": "One original print, every morning: a receipt printer, Claude, and whatever the day brings.",
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && node build.js",

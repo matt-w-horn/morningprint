@@ -1,10 +1,12 @@
-# receipt-printer
+# morningprint
 
-Every morning, a thermal receipt printer in my kitchen prints an original piece
-of character art — designed a few seconds earlier by Claude, themed to the day:
-the weather outside, the season, whatever the news feels like. One physical
-copy, 80mm wide, no screen involved. The archive is a growing stack of
-receipts.
+One original print, every morning.
+
+A thermal receipt printer in my kitchen wakes up each day and prints a piece
+of character art that has never existed before — designed seconds earlier by
+Claude, themed to the day: the weather outside, the season, whatever the news
+feels like. A short verse underneath. One physical copy, 80mm wide, and that
+is the whole broadcast.
 
 <p align="center">
   <img src="example/example_2.jpeg" width="800" alt="Two thermal receipts pinned side by side on a corkboard. Left, dated Friday July 3 2026: a lone firework rocket climbs a dotted trail through a sparse starfield above a solid-black skyline; the verse reads 'July third, the eve; one scout rocket up early, testing the dark. Tomorrow, the whole sky.' Right, dated Saturday July 4 2026: the same skyline under a sky full of firework bursts; the verse reads 'The scout kept its word. Every dark inch answers at once: blooms, rings, embers walking down to the same small town, upturned.'">
@@ -14,6 +16,13 @@ Two mornings, a day apart. On July 3 the printer sent up one scout rocket to
 test the dark, and the verse promised "tomorrow, the whole sky." On the Fourth
 it kept the word: the same skyline under a sky full of bursts. Most days stand
 on their own. Once in a while a piece answers the one before it.
+
+This started as a bet against my phone. The first minutes of the day kept
+going to feeds, so I pointed the same inputs at a printer instead. It reads
+what the feeds read (headlines, forecasts, anniversaries) and hands back one
+finished thing you can hold. There is nothing to refresh and nothing to
+scroll; when the cutter drops, the day's edition is out. Yesterday's goes up
+on the corkboard.
 
 The whole thing is a Google Apps Script. There is no server to maintain beyond
 a Raspberry Pi Zero W that pipes bytes into the printer's USB port.

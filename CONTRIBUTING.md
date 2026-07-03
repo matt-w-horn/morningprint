@@ -3,8 +3,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/matt-w-horn/receipt-printer.git
-cd receipt-printer
+git clone https://github.com/matt-w-horn/morningprint.git
+cd morningprint
 npm install
 npm run build      # tsc --noEmit + esbuild bundle -> dist/main.gs
 ```
@@ -52,5 +52,5 @@ The two docs worth knowing before touching anything:
   print. Byte output is the product; prose descriptions of it don't review well.
 
 Bigger ideas (raster graphics, evals, deploy tooling) are mapped out in the
-[roadmap issues](https://github.com/matt-w-horn/receipt-printer/issues) —
+[roadmap issues](https://github.com/matt-w-horn/morningprint/issues) —
 comment there before building so we don't collide.
