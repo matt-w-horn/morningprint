@@ -111,9 +111,11 @@ const hello = () => [ESC, 0x40, ESC, 0x74, 0x00, ...strBytes('SYSTEM ONLINE'), 0
 const asText = (t) => [ESC, 0x40, ESC, 0x74, 0x00, ...strBytes(t), 0x0a, 0x0a, 0x0a, GS, 0x56, 0x42, 0x00]; // prettier-ignore
 
 // Calibration page: (a) numbered rulers reveal the real column counts (where a
-// 48/64-char line wraps); (b) stacked █ rows under two candidate line-spacing
-// values reveal the gapless value (pick the block with NO white seams and no
-// overlap); (c) an inverted band sanity-checks GS B.
+// 48/64-char line wraps, if it wraps); (b) rows of ▀ (top half black, bottom
+// half white) under candidate ESC 3 values reveal the true gapless spacing —
+// the section whose black and white stripes are EQUAL and clean is the value
+// for one 24-dot row (solid black = overlap, value too small; extra white =
+// gaps, value too big); (c) an inverted band sanity-checks GS B.
 function ruler() {
   const b = [ESC, 0x40, ESC, 0x74, 0x00, ESC, 0x61, 0x00]; // init, CP437, left
   const seq = (n) => {
@@ -121,19 +123,20 @@ function ruler() {
     for (let i = 1; i <= n; i++) s += String(i % 10);
     return s;
   };
-  const solid = (n) => Array(n).fill(0xdb); // █ in CP437
+  const halfTop = (n) => Array(n).fill(0xdf); // ▀ in CP437
   b.push(...strBytes('FONT A ruler (48 cols):\n'), ...strBytes(seq(48)), 0x0a, 0x0a);
   b.push(ESC, 0x4d, 0x01); // Font B
   b.push(...strBytes('FONT B ruler (64 cols):\n'), ...strBytes(seq(64)), 0x0a, 0x0a);
   b.push(ESC, 0x4d, 0x00); // Font A
-  b.push(...strBytes('GAPLESS n=24 (no seams = correct):\n'));
-  b.push(ESC, 0x33, 24);
-  for (let i = 0; i < 3; i++) b.push(...solid(20), 0x0a);
-  b.push(ESC, 0x32);
-  b.push(...strBytes('GAPLESS n=43 (if 24 showed seams):\n'));
-  b.push(ESC, 0x33, 43);
-  for (let i = 0; i < 3; i++) b.push(...solid(20), 0x0a);
-  b.push(ESC, 0x32, 0x0a);
+  b.push(...strBytes('SPACING: pick the n with EQUAL clean\n'));
+  b.push(...strBytes('black/white stripes. solid black =\n'));
+  b.push(...strBytes('overlap; wide white = gaps.\n\n'));
+  for (const n of [24, 43, 48]) {
+    b.push(...strBytes(`n=${n}:\n`));
+    b.push(ESC, 0x33, n);
+    for (let i = 0; i < 4; i++) b.push(...halfTop(20), 0x0a);
+    b.push(ESC, 0x32, 0x0a);
+  }
   b.push(GS, 0x42, 0x01, ...strBytes('  INVERT BAND  '), GS, 0x42, 0x00, 0x0a);
   b.push(0x0a, 0x0a, 0x0a, GS, 0x56, 0x42, 0x00);
   return b;

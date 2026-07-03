@@ -4,19 +4,20 @@
 // byte sequence; see docs/epson-tm-t20iii-technical-reference-guide.pdf. Keep the
 // byte values verbatim — they are not arbitrary.
 
-// Printer geometry. This TM-T20III runs in 42-column mode (every legacy wrap
-// width in calendar/briefing is 42): Font A (12x24) = 42 columns, Font B (9x17)
-// = 56 columns. If the printer is ever reconfigured to 48-column mode these
-// become 48/64 — verify with `node test-print.mjs ruler`.
-export const COLS_A = 42;
-export const COLS_B = 56;
+// Printer geometry. This TM-T20III runs in standard 48-column mode — confirmed
+// with `node test-print.mjs ruler` (a 48-char Font A line and a 64-char Font B
+// line each fit without wrapping). The legacy calendar/briefing layouts wrap at
+// 42 and simply leave a margin. Re-verify with the ruler if reconfigured.
+export const COLS_A = 48;
+export const COLS_B = 64;
 
-// Dot height of one character row, used for gapless line spacing (ESC 3 n feeds
-// exactly one glyph height so block characters tile with no white seam).
-// Assumes the vertical motion unit is one dot (1/203"); if the ruler test shows
-// gaps between stacked █ rows, the unit is 1/360" and these become 43/30.
-export const ROW_DOTS_A = 24;
-export const ROW_DOTS_B = 17;
+// ESC 3 n values that make consecutive rows tile with zero white seam (used for
+// gapless block art). n is in the printer's vertical motion units, NOT dots —
+// calibrated with the ruler page's ▀-stripe test (the section whose black and
+// white stripes are equal and clean is the correct value; solid black means
+// overlap, extra white means gaps).
+export const ROW_DOTS_A = 24; // one Font A row (24 dots tall)
+export const ROW_DOTS_B = 17; // one Font B row (17 dots tall)
 
 export const CMD = {
   INIT: [0x1b, 0x40],

@@ -67,7 +67,7 @@ export const ART_SCHEMA = {
       type: 'string',
       description:
         'Gallery-placard caption printed under the piece: 1-2 short lines, ' +
-        'max 42 characters per line. Wry or poetic; may nod to the theme source.',
+        `max ${COLS_A} characters per line. Wry or poetic; may nod to the theme source.`,
     },
     ops: {
       type: 'array',
@@ -87,7 +87,7 @@ export const ART_SCHEMA = {
             type: 'integer',
             description:
               'Glyph width multiplier 1-8 (default 1). At width w a Font A row ' +
-              'fits floor(42/w) characters; longer rows are truncated.',
+              `fits floor(${COLS_A}/w) characters; longer rows are truncated.`,
           },
           height: {
             type: 'integer',
@@ -105,7 +105,7 @@ export const ART_SCHEMA = {
           font: {
             type: 'string',
             enum: ['A', 'B'],
-            description: 'A = 12x24, 42 columns. B = 9x17, 56 columns, finer texture.',
+            description: `A = 12x24, ${COLS_A} columns. B = 9x17, ${COLS_B} columns, finer texture.`,
           },
           gapless: {
             type: 'boolean',
@@ -154,7 +154,7 @@ CRAFT
 EACH DAY
 - You receive the date, season, and local weather, and may run a few brief web searches to feel the day (news mood, holidays, anniversaries, events). Searching is optional — skip it when the weather or season already gives you the piece.
 - Choose ONE evocative theme for today and commit to it. Vary radically from day to day: a landscape, a geometric abstraction, a pattern study, a giant-type poster, a tiny vignette, a weather glyph, a constellation map, a data-texture — never an obvious repeat of a recent idea.
-- Return title (punchy, UPPERCASE, ≤20 chars), caption (1-2 lines ≤42 chars each, gallery-placard voice), and the ops.`;
+- Return title (punchy, UPPERCASE, ≤20 chars), caption (1-2 lines ≤${COLS_A} chars each, gallery-placard voice), and the ops.`;
 
 // Build the user-turn context string. Pure — safe to call from the Node harness.
 export function buildArtContext(
