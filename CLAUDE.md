@@ -67,9 +67,12 @@ optional pre-commit hook as a backstop.
 
 ## Conventions & gotchas
 
-- **ESC/POS is byte-exact.** The `CMD` table and the `0xC9/0xCD/0xBB` box-drawing
-  bytes assume the printer's CP437 code page (`CMD.CP437` is sent on init).
-  Preserve byte values verbatim; don't "clean up" the escape sequences.
+- **ESC/POS is byte-exact.** The target printer is an **Epson TM-T20III** (80mm,
+  auto-cutter); its command reference is bundled at
+  `docs/epson-tm-t20iii-technical-reference-guide.pdf`. The `CMD` table and the
+  `0xC9/0xCD/0xBB` box-drawing bytes assume the printer's CP437 code page
+  (`CMD.CP437` is sent on init). Preserve byte values verbatim; don't "clean up"
+  the escape sequences.
 - **`sendToPi` converts to signed bytes** (`val - 256` for `>= 128`) before
   building the octet-stream blob — that's intentional for the transport, leave it.
 - **Fail-loud calendar path.** `checkAndPrintRobust` holds a script lock, throws

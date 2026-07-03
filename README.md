@@ -20,8 +20,17 @@ Two jobs ship today, each on its own time-based trigger; more are planned:
 Apps Script trigger
   └─ build ESC/POS byte array (CMD.* command table + text helpers)
       └─ sendToPi(): POST octet-stream to PI_URL (Basic auth: NGROK_USER/PASS)
-          └─ Raspberry Pi bridge → USB/serial thermal printer
+          └─ Raspberry Pi bridge → Epson TM-T20III (USB, ESC/POS)
 ```
+
+## Hardware
+
+The printer is an **Epson TM-T20III** — an 80mm ESC/POS thermal receipt printer
+with an auto-cutter. Its full command set is bundled at
+[`docs/epson-tm-t20iii-technical-reference-guide.pdf`](docs/epson-tm-t20iii-technical-reference-guide.pdf)
+(Epson's Technical Reference Guide) — the reference for every byte in the `CMD`
+table: the CP437 code page, `GS !` sizing (48 columns at Font A on 80mm paper),
+`GS V` cut, and `GS B` invert.
 
 ## Deploy
 
