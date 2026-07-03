@@ -41,6 +41,16 @@ npm run pull       # clasp pull — fetch remote back down (if the editor was to
 Script ID: `1TQHIiH25ZM-aMjmeSvsy4sWlR0VSWZwO1zLO2y6-EW1QbGo-LCBBaS1d`
 (also in `.clasp.json`; open with `npx clasp open-script`).
 
+## Deployment
+
+Push-first, always — the `apps-script-deploy` skill has the full ritual. The
+short version: ask the user to close any open Apps Script editor tabs (a stale
+editor session has silently saved old code over a fresh push, twice), then
+`npm run push`, then verify in a **fresh** tab via `npx clasp open-script` —
+never in a tab that was already open. If the remote looks stale, re-push once;
+if it reverts again, hunt down the open editor session instead of pushing a
+third time.
+
 ## Architecture (TypeScript + esbuild, like `nudge`)
 
 Apps Script has no module system and calls trigger/editor functions by their bare
@@ -128,5 +138,9 @@ payload without printing.
   them, so the model and renderer always agree. Recalibrate with
   `node test-print.mjs ruler` if the printer is reconfigured — the same page
   verifies the gapless line-spacing values (`ROW_DOTS_A = 24`, `ROW_DOTS_B = 17`).
+- **Confirm art-direction changes before building them.** For any rework of the
+  art pipeline's visual output (prompt, spec schema, renderer), agree on the
+  intended style/layout with the user first — a past redesign was built
+  pixel-grid-first when vector-style art was wanted, and had to be redone.
 - Keep it green: `npm run build` (tsc + bundle) and `npm run format` before
   committing. CI runs `prettier --check`.
