@@ -5,9 +5,9 @@
 // Apps Script uses via sendToPi), so you can iterate on receipt layout without
 // deploying to Apps Script or waiting on a calendar trigger.
 //
-// For `calendar` / `briefing` it loads the REAL builders from src/ (Code.js +
-// WeatherReport.gs.js) in the same order Apps Script does, so the preview matches
-// what production prints — including the shared-global quirks (see CLAUDE.md).
+// For `calendar` / `briefing` it loads the REAL builders from the built bundle
+// (dist/main.gs) — run `npm run build` first — so the preview matches exactly what
+// gets deployed and printed.
 //
 // Credentials come from the environment or a gitignored .env (never hardcoded):
 //   PI_URL, NGROK_USER, NGROK_PASS   — copy .env.example to .env and fill in.
@@ -86,23 +86,18 @@ function loadDotEnv() {
   }
 }
 
-// Load the plain-JS Apps Script sources and expose their top-level builders.
-// GAS globals (UrlFetchApp, PropertiesService, ...) are only touched at call
-// time by functions we don't invoke here, so loading is side-effect-free.
+// Load the built bundle and expose its receipt builders. The bundle's IIFE only
+// defines things at eval time (GAS globals are touched only inside functions we
+// don't call here), so loading is side-effect-free.
 function loadBuilders() {
-  const src = ['Code.js', 'WeatherReport.gs.js']
-    .map((f) => readFileSync(join(HERE, 'src', f), 'utf8'))
-    .join('\n;\n');
-  const footer = `
-    ;globalThis.__exports = {
-      generateReceiptPayload:
-        typeof generateReceiptPayload !== 'undefined' ? generateReceiptPayload : undefined,
-      buildDeepReceipt:
-        typeof buildDeepReceipt !== 'undefined' ? buildDeepReceipt : undefined,
-    };`;
+  const bundle = join(HERE, 'dist', 'main.gs');
+  if (!existsSync(bundle)) {
+    console.error('dist/main.gs not found — run `npm run build` first.');
+    process.exit(1);
+  }
   const ctx = vm.createContext({ console, Logger: { log() {} } });
-  vm.runInContext(src + footer, ctx, { filename: 'src(Code.js+WeatherReport.gs.js)' });
-  return ctx.__exports;
+  vm.runInContext(readFileSync(bundle, 'utf8'), ctx, { filename: 'dist/main.gs' });
+  return ctx.__receipt; // { generateReceiptPayload, buildDeepReceipt, ... }
 }
 
 // Self-contained ESC/POS for the hello/text modes (independent of src).

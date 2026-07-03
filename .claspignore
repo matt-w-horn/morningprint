@@ -1,7 +1,5 @@
-# clasp pushes from src/ (see .clasp.json "rootDir": "src"). Paths below are
-# resolved relative to that rootDir. Whitelist only the manifest and the Apps
-# Script source files; ignore anything else that lands in src/.
+# clasp pushes from the build output (see .clasp.json "rootDir": "dist").
+# Whitelist only the bundled script + manifest; ignore everything else.
 **/**
 !appsscript.json
-!*.js
-!*.gs
+!main.gs

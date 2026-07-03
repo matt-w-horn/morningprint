@@ -5,13 +5,13 @@ Guidance for Claude Code working in this repository.
 ## What this is
 
 **receipt-printer** turns a thermal receipt printer into a personal output
-device, driven by a standalone Google Apps Script (plain JavaScript, V8 runtime).
+device, driven by a standalone Google Apps Script (TypeScript, V8 runtime).
 Anything Apps Script can reach can become a printed receipt; two independent
 time-triggered jobs ship today and share one printing library (more are planned):
 
-- `checkAndPrintRobust()` in `Code.js` — scans a Google Calendar and prints each
-  new event as a receipt.
-- `printAIMorningBriefing()` in `WeatherReport.gs.js` — builds a weather + Gemini
+- `checkAndPrintRobust()` in `src/calendar.ts` — scans a Google Calendar and
+  prints each new event as a receipt.
+- `printAIMorningBriefing()` in `src/briefing.ts` — builds a weather + Gemini
   briefing and prints it.
 
 Both assemble [ESC/POS](https://en.wikipedia.org/wiki/ESC/POS) byte arrays and
@@ -20,62 +20,88 @@ receiving end — a Pi Zero W running a Python `http.server` that pipes raw byte
 to `/dev/usb/lp0`, behind an ngrok static domain + basic auth, managed by systemd
 — is documented in [`docs/pi-print-server-runbook.md`](docs/pi-print-server-runbook.md).
 
-Local `src/` is the source of truth; `clasp` pushes it verbatim. The Apps Script
-web editor is a mirror — edit locally, `npm run push`, don't hand-edit online.
+TypeScript under `src/` is the source of truth. esbuild bundles it to a single
+`dist/main.gs`; `clasp` pushes that. The Apps Script web editor is never edited
+directly — edit locally, `npm run push`.
 
 ## Commands
 
 ```bash
-npm install        # dev tooling only: clasp + prettier
+npm install        # dev tooling: clasp, typescript, esbuild, prettier
+npm run build      # tsc --noEmit + esbuild bundle -> dist/main.gs (+ appsscript.json)
+npm run typecheck  # tsc --noEmit
 npm run format     # prettier --write
-npm run status     # clasp status — list files that would be pushed
-npm run push       # clasp push — upload src/ to the Apps Script project
-npm run pull       # clasp pull — fetch remote back down (if the editor was edited)
+npm run test:print # local print/iteration harness (see below + README)
+npm run status     # clasp status — list files that would be pushed (from dist/)
+npm run push       # npm run build && clasp push — build then upload dist/
+npm run pull       # clasp pull — fetch remote back down (if the editor was touched)
 ```
 
 Script ID: `1TQHIiH25ZM-aMjmeSvsy4sWlR0VSWZwO1zLO2y6-EW1QbGo-LCBBaS1d`
 (also in `.clasp.json`; open with `npx clasp open-script`).
 
-## Important: no build, no bundler — do NOT introduce one
+## Architecture (TypeScript + esbuild, like `nudge`)
 
-Unlike the sibling `nudge` project (TypeScript + esbuild → single `dist/main.gs`),
-this project is **plain Apps Script pushed as-is**, and it must stay that way:
+Apps Script has no module system and calls trigger/editor functions by their bare
+global name. esbuild bundles the whole `src/` import graph into one IIFE
+(`dist/main.gs`), and a footer in `build.js` re-exposes the entry points as
+top-level globals so the runtime and editor can find them.
 
-- Apps Script runs every `.js`/`.gs` file in **one shared global scope**. The two
-  files rely on that — `WeatherReport.gs.js` calls `sendToPi` and `CMD` which are
-  defined in `Code.js`.
-- Both files also define their own `wrapText` and `stringToBytes` at top level;
-  they collide in the shared scope (last definition loaded wins). Bundling with
-  esbuild would put each file in an isolated module and **silently change this
-  behavior**. Don't do it.
-- Trigger handlers and editor-run functions (`checkAndPrintRobust`,
-  `printAIMorningBriefing`, `testPrinter`) are called by their bare global name,
-  so they must remain top-level function declarations.
+```
+src/escpos.ts     CMD command table + stringToBytes (shared)
+src/calendar.ts   checkAndPrintRobust, generateReceiptPayload, sendToPi, testPrinter
+src/briefing.ts   printAIMorningBriefing, buildDeepReceipt, getDeepWeather, ...
+src/main.ts       re-exports the entry points (+ builders, for the harness)
+build.js          esbuild bundle -> dist/main.gs; ENTRY_POINTS -> global footer
+```
 
-If you refactor, preserve the shared-global model (or consolidate the duplicate
-helpers deliberately, in one place) — don't reach for a module bundler.
+- **Entry points** = `checkAndPrintRobust`, `printAIMorningBriefing`,
+  `testPrinter`. They must be exported from `src/main.ts` **and** listed in
+  `ENTRY_POINTS` in `build.js` (the footer wraps each as a bare global). Existing
+  time triggers reference these names, so don't rename them.
+- **The old shared-global collision is resolved.** These were two plain `.gs`
+  files in one global scope; both defined `wrapText`/`stringToBytes`, and the
+  last-loaded won. In the module version each file keeps its own `wrapText`
+  (calendar's breaks long words; briefing's doesn't) and `stringToBytes` is shared
+  from `escpos.ts` (both old copies were byte-identical). The conversion was
+  verified **byte-for-byte** against the old output for the sample calendar and
+  briefing receipts — behavior is preserved for realistic input. The only place
+  they could diverge is a single word longer than the wrap width.
+- **`treeShaking: false`** in `build.js` keeps every function in `src/` in the
+  bundle, including the currently-dormant `fetchNewsStream`.
+- The deployed project is now the single bundled `main.gs` (it replaced the old
+  `Code`/`WeatherReport.gs` files on push).
 
 ## Configuration & secrets
 
 All real secrets live in **Script Properties**, never in the repo: `PI_URL`,
 `NGROK_USER`, `NGROK_PASS`, `GEMINI_KEY` (used for both Gemini and the Google
 Weather API), `NEWS_KEY`, `LAT`, `LON`. Never hardcode these or log them.
-`CALENDAR_ID` and `EMAIL_ALERTS_TO` are hardcoded consts at the top of `Code.js`.
+`CALENDAR_ID` and `EMAIL_ALERTS_TO` are consts at the top of `src/calendar.ts`.
 `PRINT_MEMORY` and `LAST_ALERT_TIME` are script-managed state keys.
 
 `.clasp.json` **is committed** here (it holds only the scriptId + push config, no
-credentials) so `git clone && npm run push` works. Only `.clasprc.json` (the
-actual OAuth credential, in `~/`) is gitignored. gitleaks runs in CI and via an
-optional pre-commit hook as a backstop.
+credentials) so `git clone && npm run push` works. `.clasprc.json` (the OAuth
+credential, in `~/`), `dist/`, and `.env` (local test creds) are gitignored.
+gitleaks runs in CI and via an optional pre-commit hook as a backstop.
+
+## Local iteration
+
+`test-print.mjs` (run via `npm run test:print -- <mode>` or `node test-print.mjs
+<mode>`) POSTs ESC/POS straight to the Pi — the same endpoint Apps Script uses —
+so you can iterate without deploying. `calendar`/`briefing` load the real builders
+from the built `dist/main.gs`, so **run `npm run build` first**; the preview then
+matches production exactly. Credentials come from a gitignored `.env` (copy
+`.env.example`). Add `--dry` to preview the hex payload without printing.
 
 ## Conventions & gotchas
 
 - **ESC/POS is byte-exact.** The target printer is an **Epson TM-T20III** (80mm,
   auto-cutter); its command reference is bundled at
-  `docs/epson-tm-t20iii-technical-reference-guide.pdf`. The `CMD` table and the
-  `0xC9/0xCD/0xBB` box-drawing bytes assume the printer's CP437 code page
-  (`CMD.CP437` is sent on init). Preserve byte values verbatim; don't "clean up"
-  the escape sequences.
+  `docs/epson-tm-t20iii-technical-reference-guide.pdf`. The `CMD` table
+  (`src/escpos.ts`) and the `0xC9/0xCD/0xBB` box-drawing bytes assume the printer's
+  CP437 code page (`CMD.CP437` is sent on init). Preserve byte values verbatim.
+  `build.js` uses `charset: 'utf8'` so the `°` byte survives bundling.
 - **`sendToPi` converts to signed bytes** (`val - 256` for `>= 128`) before
   building the octet-stream blob — that's intentional for the transport, leave it.
 - **Fail-loud calendar path.** `checkAndPrintRobust` holds a script lock, throws
@@ -87,5 +113,5 @@ optional pre-commit hook as a backstop.
   (Apps Script has no `fetch`), with `googleSearch` grounding and
   `thinkingLevel: high`. The news fetch (`fetchNewsStream`) is currently commented
   out of the briefing.
-- Keep formatting clean: `npm run format` before committing; CI runs
-  `prettier --check`.
+- Keep it green: `npm run build` (tsc + bundle) and `npm run format` before
+  committing. CI runs `prettier --check`.

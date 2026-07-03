@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Build output (esbuild bundle; clasp pushes it, git doesn't track it)
+dist/
+
 # clasp credentials — never commit. (.clasp.json IS committed here, on purpose:
 # it holds only the scriptId + push config, no secrets — see CLAUDE.md.)
 .clasprc.json

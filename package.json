@@ -5,15 +5,20 @@
   "description": "Turn a thermal receipt printer into a personal output device — driven by Google Apps Script.",
   "type": "module",
   "scripts": {
+    "build": "tsc --noEmit && node build.js",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:print": "node test-print.mjs",
     "status": "clasp status",
-    "push": "clasp push",
+    "push": "npm run build && clasp push",
     "pull": "clasp pull"
   },
   "devDependencies": {
     "@google/clasp": "^3.3.0",
-    "prettier": "^3.8.4"
+    "@types/google-apps-script": "^2.0.11",
+    "esbuild": "^0.28.1",
+    "prettier": "^3.8.4",
+    "typescript": "^5.9.3"
   }
 }

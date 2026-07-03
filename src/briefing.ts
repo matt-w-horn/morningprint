@@ -1,3 +1,10 @@
+// AI morning briefing → receipt. printAIMorningBriefing() pulls weather + a Gemini
+// briefing (with Google Search grounding) and prints it. Shares the CMD table and
+// stringToBytes with the calendar path, and sends via that path's sendToPi.
+
+import { CMD, stringToBytes } from './escpos';
+import { sendToPi } from './calendar';
+
 // --- CONFIGURATION ---
 const DRY_RUN = false; // Set to FALSE to print physically
 
@@ -5,7 +12,31 @@ const DRY_RUN = false; // Set to FALSE to print physically
 const PERSONA =
   'You are a smart daily briefing assistant. Tone: Clear, professional, and natural. Do not use robotic commands. Use plain English to explain what comes next.';
 
-function printAIMorningBriefing() {
+interface Source {
+  title: string;
+  url: string;
+}
+
+interface AiResult {
+  text: string;
+  sources: Source[];
+}
+
+interface WeatherData {
+  current: number;
+  feels_like: number;
+  high: number;
+  low: number;
+  humidity: unknown;
+  wind: number;
+  uv: unknown;
+  rain_chance: number;
+  code: string;
+  forecast: string;
+  currentConditions: string;
+}
+
+export function printAIMorningBriefing(): void {
   const props = PropertiesService.getScriptProperties();
   const lat = props.getProperty('LAT');
   const lon = props.getProperty('LON');
@@ -20,7 +51,7 @@ function printAIMorningBriefing() {
   // 1. Fetch Hardcoded Data (Ground Truth)
   // We fetch these first to give the AI a solid baseline
   Logger.log('📡 Fetching Telemetry...');
-  let weatherData = null;
+  let weatherData: WeatherData | null = null;
   //let newsData = { text: "No news signal.", sources: [] };
 
   try {
@@ -55,7 +86,12 @@ function printAIMorningBriefing() {
 }
 
 // --- GEMINI 3 CLIENT (REST API) ---
-function generateDeepBriefing(lat, lon, apiKey, wData) {
+function generateDeepBriefing(
+  lat: string,
+  lon: string | null,
+  apiKey: string,
+  wData: WeatherData | null,
+): AiResult | null {
   const model = 'gemini-3-pro-preview';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -96,7 +132,7 @@ function generateDeepBriefing(lat, lon, apiKey, wData) {
     ],
   };
 
-  const options = {
+  const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(payload),
@@ -116,24 +152,26 @@ function generateDeepBriefing(lat, lon, apiKey, wData) {
   if (!candidate) return null;
 
   const text = candidate.content.parts
-    .map((p) => p.text)
+    .map((p: { text: string }) => p.text)
     .join('')
     .trim();
 
   // Extract Sources (Gemini 3 Search Results)
-  let sources = [];
+  const sources: Source[] = [];
   if (candidate.groundingMetadata?.groundingChunks) {
-    candidate.groundingMetadata.groundingChunks.forEach((c) => {
-      if (c.web?.uri) sources.push({ title: c.web.title, url: c.web.uri });
-    });
+    candidate.groundingMetadata.groundingChunks.forEach(
+      (c: { web?: { uri?: string; title?: string } }) => {
+        if (c.web?.uri) sources.push({ title: c.web.title ?? '', url: c.web.uri });
+      },
+    );
   }
 
   return { text: text, sources: sources };
 }
 
 // --- RECEIPT BUILDER ---
-function buildDeepReceipt(aiResult, w) {
-  let p = [];
+export function buildDeepReceipt(aiResult: AiResult, w: WeatherData | null): number[] {
+  let p: number[] = [];
   const now = new Date();
   const dateStr = now
     .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -166,7 +204,7 @@ function buildDeepReceipt(aiResult, w) {
   const paragraphs = aiResult.text.split('\n');
 
   paragraphs.forEach((para) => {
-    let line = para.trim();
+    const line = para.trim();
     if (line.length === 0) return;
 
     // Detect Bold Headers (e.g. **Weather Outlook**)
@@ -186,8 +224,8 @@ function buildDeepReceipt(aiResult, w) {
     p = p.concat(stringToBytes('------------------------------------------\n'));
     p = p.concat(CMD.BOLD_ON, stringToBytes('DATA LINKS:\n'), CMD.BOLD_OFF);
 
-    const unique = [];
-    const seen = new Set();
+    const unique: Source[] = [];
+    const seen = new Set<string>();
     aiResult.sources.forEach((s) => {
       if (!s.url || seen.has(s.url)) return;
       seen.add(s.url);
@@ -208,11 +246,33 @@ function buildDeepReceipt(aiResult, w) {
   return p;
 }
 
+// --- UTILITY: WORD WRAPPER ---
+// The briefing's own wrapper (no long-word breaking). The calendar module has a
+// different one; keeping them module-local removes the old global collision.
+function wrapText(text: string, maxLength: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = words[0];
+
+  for (let i = 1; i < words.length; i++) {
+    if (currentLine.length + 1 + words[i].length <= maxLength) {
+      currentLine += ' ' + words[i];
+    } else {
+      lines.push(currentLine);
+      currentLine = words[i];
+    }
+  }
+  lines.push(currentLine);
+  return lines;
+}
+
 // ==========================================
 //           SENSORS (HARDCODED)
 // ==========================================
 
-function fetchNewsStream(apiKey) {
+// Currently unused (the news path is commented out of the briefing), kept for
+// when it's re-enabled.
+function fetchNewsStream(apiKey: string): { text: string; sources: Source[] } {
   const url = `https://newsapi.org/v2/top-headlines?country=us&pageSize=10&apiKey=${apiKey}`;
   const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
 
@@ -225,8 +285,8 @@ function fetchNewsStream(apiKey) {
     return { text: 'NEWS_EMPTY', sources: [] };
 
   let contextString = 'HEADLINES:\n';
-  let sourceLinks = [];
-  json.articles.forEach((art, index) => {
+  const sourceLinks: Source[] = [];
+  json.articles.forEach((art: any, index: number) => {
     const source = art.source.name || 'Unknown';
     const title = art.title || 'Redacted';
     contextString += `- [${source}] ${title}\n`;
@@ -235,7 +295,7 @@ function fetchNewsStream(apiKey) {
   return { text: contextString, sources: sourceLinks };
 }
 
-function getDeepWeather(lat, lon, apiKey) {
+function getDeepWeather(lat: string, lon: string | null, apiKey: string): WeatherData {
   const currentUrl = `https://weather.googleapis.com/v1/currentConditions:lookup?key=${apiKey}&location.latitude=${lat}&location.longitude=${lon}&unitsSystem=IMPERIAL`;
   const currentRes = UrlFetchApp.fetch(currentUrl, { muteHttpExceptions: false });
   const currentData = JSON.parse(currentRes.getContentText());
@@ -248,12 +308,12 @@ function getDeepWeather(lat, lon, apiKey) {
     minTemp = 200,
     maxRain = 0;
   if (forecastData.forecastHours) {
-    forecastData.forecastHours.forEach((h) => {
+    forecastData.forecastHours.forEach((h: any) => {
       const t = h.temperature.degrees;
-      const p = h.precipitation?.probability?.percent || 0;
+      const pr = h.precipitation?.probability?.percent || 0;
       if (t > maxTemp) maxTemp = t;
       if (t < minTemp) minTemp = t;
-      if (p > maxRain) maxRain = p;
+      if (pr > maxRain) maxRain = pr;
     });
   } else {
     maxTemp = currentData.temperature.degrees;
@@ -275,27 +335,6 @@ function getDeepWeather(lat, lon, apiKey) {
   };
 }
 
-// ==========================================
-//           UTILITIES
-// ==========================================
-
-function wrapText(text, maxLength) {
-  const words = text.split(' ');
-  let lines = [];
-  let currentLine = words[0];
-
-  for (let i = 1; i < words.length; i++) {
-    if (currentLine.length + 1 + words[i].length <= maxLength) {
-      currentLine += ' ' + words[i];
-    } else {
-      lines.push(currentLine);
-      currentLine = words[i];
-    }
-  }
-  lines.push(currentLine);
-  return lines;
-}
-
-function stringToBytes(str) {
-  return str.split('').map((c) => c.charCodeAt(0));
-}
+// Retained so treeShaking:false keeps it in the bundle until the news path is
+// wired back in; referencing it here avoids an "unused" lint in strict configs.
+void fetchNewsStream;

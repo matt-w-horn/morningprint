@@ -8,10 +8,10 @@ services, any REST API, an LLM — can become a printed receipt.
 
 Two jobs ship today, each on its own time-based trigger; more are planned:
 
-- **Calendar → receipt** (`Code.js`) — `checkAndPrintRobust()` scans a Google
-  Calendar for events in a rolling window and prints each new one as a receipt
-  (bordered header, big title, checkbox-aware description).
-- **AI morning briefing → receipt** (`WeatherReport.gs.js`) —
+- **Calendar → receipt** (`src/calendar.ts`) — `checkAndPrintRobust()` scans a
+  Google Calendar for events in a rolling window and prints each new one as a
+  receipt (bordered header, big title, checkbox-aware description).
+- **AI morning briefing → receipt** (`src/briefing.ts`) —
   `printAIMorningBriefing()` pulls current weather + a 24h forecast, asks Gemini
   (with Google Search grounding) for a short weather/news/status briefing, and
   prints it with a weather header and source links.
@@ -48,13 +48,14 @@ manager and in Script Properties.
 
 ## Deploy
 
-Local source is the source of truth; `clasp` pushes it straight to the Apps
-Script project (no build step — the files are pushed as-is).
+TypeScript under `src/` is the source of truth; esbuild bundles it to a single
+`dist/main.gs`, which `clasp` pushes.
 
 ```bash
-npm install        # dev tooling: clasp + prettier
+npm install        # dev tooling: clasp, typescript, esbuild, prettier
+npm run build      # tsc --noEmit + esbuild bundle -> dist/main.gs
 npm run status     # list the files clasp would push (dry check)
-npm run push       # clasp push — upload src/ to the Apps Script project
+npm run push       # build, then clasp push (uploads dist/)
 ```
 
 The Apps Script web editor is a mirror, not a second source of truth — edit
@@ -80,7 +81,7 @@ No secrets live in the repo. Runtime config is read from **Script Properties**
 | `LAT`        | briefing | latitude for weather                                |
 | `LON`        | briefing | longitude for weather                               |
 
-A couple of values are still hardcoded at the top of `Code.js` —
+A couple of values are still hardcoded at the top of `src/calendar.ts` —
 `CALENDAR_ID` (which calendar to print) and `EMAIL_ALERTS_TO` (where failure
 alerts go). Two state keys are managed by the script itself and need no setup:
 `PRINT_MEMORY` (de-dupes already-printed events) and `LAST_ALERT_TIME` (rate-limits
@@ -90,11 +91,12 @@ alert emails).
 
 `test-print.mjs` sends ESC/POS straight to the Pi bridge (the same endpoint Apps
 Script hits), so you can iterate on receipt layout without deploying or waiting
-on a trigger. For `calendar`/`briefing` it loads the real builders from `src/`,
-so the preview matches production.
+on a trigger. `calendar`/`briefing` load the real builders from the built
+`dist/main.gs`, so run `npm run build` first; the preview then matches production.
 
 ```bash
 cp .env.example .env            # then fill in NGROK_USER / NGROK_PASS
+npm run build                   # needed for calendar/briefing (they load dist/main.gs)
 node test-print.mjs hello       # minimal "SYSTEM ONLINE" connectivity test
 node test-print.mjs text "Hi"   # arbitrary text
 node test-print.mjs calendar    # sample calendar-event receipt (edit MOCKS in the file)
@@ -102,8 +104,8 @@ node test-print.mjs briefing    # sample AI-briefing receipt
 node test-print.mjs calendar --dry   # print the hex payload instead of sending
 ```
 
-`.env` is gitignored; credentials never live in the repo. This script is not part
-of the Apps Script bundle (clasp only pushes `src/`).
+`.env` is gitignored; credentials never live in the repo. This script is local
+only — it isn't bundled into `dist/` or pushed to Apps Script.
 
 ## Triggers
 
@@ -114,16 +116,19 @@ Set up in the Apps Script editor (Triggers → Add Trigger), time-driven:
 - `printAIMorningBriefing` — once each morning.
 
 `testPrinter()` prints two sample receipts to verify the hardware path. Set
-`DRY_RUN = true` in `WeatherReport.gs.js` to log the briefing instead of
-printing it.
+`DRY_RUN = true` in `src/briefing.ts` to log the briefing instead of printing it.
 
 ## Layout
 
 ```
 src/
-  appsscript.json       manifest (V8, America/Los_Angeles, Calendar adv. service)
-  Code.js               calendar → receipt + the shared CMD/print helpers
-  WeatherReport.gs.js   AI morning briefing → receipt
+  appsscript.json   manifest (V8, America/Los_Angeles, Calendar adv. service)
+  escpos.ts         CMD command table + stringToBytes (shared)
+  calendar.ts       calendar → receipt, the sendToPi transport, testPrinter
+  briefing.ts       AI morning briefing → receipt
+  main.ts           entry points re-exported for the build footer
+build.js            esbuild bundle → dist/main.gs
 ```
 
-`src/` is what `clasp` uploads (`.clasp.json` → `"rootDir": "src"`).
+`npm run build` bundles `src/` into `dist/main.gs`; `clasp` uploads `dist/`
+(`.clasp.json` → `"rootDir": "dist"`). `dist/` is gitignored.

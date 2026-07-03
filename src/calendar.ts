@@ -1,56 +1,29 @@
+// Calendar → receipt. A daily-ish time trigger runs checkAndPrintRobust(), which
+// scans a Google Calendar and prints each new event, plus the shared transport
+// (sendToPi) that both this and the briefing use.
+
+import { CMD, stringToBytes } from './escpos';
+
 // --- CONFIGURATION ---
 const CALENDAR_ID =
   'REDACTED_CALENDAR_ID';
 const EMAIL_ALERTS_TO = 'redacted@example.com';
 const MAX_RETRIES = 3;
 
-// --- FORMATTING LIBRARY ---
-const CMD = {
-  INIT: [0x1b, 0x40],
-  CP437: [0x1b, 0x74, 0x00],
-
-  ALIGN_CENTER: [0x1b, 0x61, 0x01],
-  ALIGN_LEFT: [0x1b, 0x61, 0x00],
-
-  BOLD_ON: [0x1b, 0x45, 0x01],
-  BOLD_OFF: [0x1b, 0x45, 0x00],
-
-  INVERT_ON: [0x1d, 0x42, 0x01], // White text on black background
-  INVERT_OFF: [0x1d, 0x42, 0x00],
-
-  // Font Sizes
-  SIZE_NORMAL: [0x1d, 0x21, 0x00], // Fits ~48 Chars
-  SIZE_DOUBLE_HEIGHT: [0x1d, 0x21, 0x01], // Fits ~48 Chars (Tall)
-  SIZE_2X: [0x1d, 0x21, 0x11], // Fits ~24 Chars (Big)
-
-  FEED_LINES: (n) => [0x1b, 0x64, n],
-  CUT_PAPER: [0x1d, 0x56, 0x42, 0x00],
-
-  // Line Spacing
-  SET_LINE_SPACING: (n) => [0x1b, 0x33, n],
-  RESET_LINE_SPACING: [0x1b, 0x32],
-
-  GET_BORDER_TOP: function () {
-    let line = [0xc9];
-    for (let i = 0; i < 40; i++) line.push(0xcd);
-    line.push(0xbb);
-    line.push(0x0a);
-    return line;
-  },
-
-  GET_BORDER_BOTTOM: function () {
-    let line = [0xc8];
-    for (let i = 0; i < 40; i++) line.push(0xcd);
-    line.push(0xbc);
-    line.push(0x0a);
-    return line;
-  },
-};
-
 // --- TIME WINDOW SETTINGS ---
 const LOOKBACK_HOURS = 12;
 
-function checkAndPrintRobust() {
+// The subset of a CalendarEvent this module needs. Real CalendarApp events and
+// the testPrinter() mocks both satisfy it structurally.
+export interface ReceiptEvent {
+  getId(): string;
+  getTitle(): string;
+  getDescription(): string | null;
+  getStartTime(): Date;
+  isAllDayEvent(): boolean;
+}
+
+export function checkAndPrintRobust(): void {
   Logger.log('🔒 [System] Attempting to acquire script lock...');
 
   const lock = LockService.getScriptLock();
@@ -64,7 +37,7 @@ function checkAndPrintRobust() {
     const now = new Date();
     const scriptProperties = PropertiesService.getScriptProperties();
 
-    let memory = JSON.parse(
+    const memory = JSON.parse(
       scriptProperties.getProperty('PRINT_MEMORY') || '{"printedEventIds":[]}',
     );
 
@@ -74,10 +47,10 @@ function checkAndPrintRobust() {
         ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
         : now;
 
-    const events = CalendarApp.getCalendarById(CALENDAR_ID).getEvents(
+    const events = CalendarApp.getCalendarById(CALENDAR_ID)!.getEvents(
       timeWindowStart,
       timeWindowEnd,
-    );
+    ) as unknown as ReceiptEvent[];
 
     events.forEach((event) => {
       const eventId = event.getId() + '_' + event.getStartTime().getTime();
@@ -118,8 +91,8 @@ function checkAndPrintRobust() {
 }
 
 // --- HELPER: GENERATE RECEIPT ---
-function generateReceiptPayload(event) {
-  let payload = [];
+export function generateReceiptPayload(event: ReceiptEvent): number[] {
+  let payload: number[] = [];
 
   const now = new Date();
   const dateString = now
@@ -130,8 +103,8 @@ function generateReceiptPayload(event) {
     : event.getStartTime().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // --- CLEAN DESCRIPTION ---
-  let rawDesc = event.getDescription() || '';
-  let cleanDesc = rawDesc
+  const rawDesc = event.getDescription() || '';
+  const cleanDesc = rawDesc
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
     .replace(/<[^>]*>?/gm, '')
@@ -159,7 +132,7 @@ function generateReceiptPayload(event) {
   payload = payload.concat(CMD.FEED_LINES(1));
   payload = payload.concat(CMD.SIZE_2X);
 
-  let titleLines = wrapText(event.getTitle().toUpperCase(), 24);
+  const titleLines = wrapText(event.getTitle().toUpperCase(), 24);
   titleLines.forEach((line) => {
     payload = payload.concat(stringToBytes(line + '\n'));
   });
@@ -177,20 +150,20 @@ function generateReceiptPayload(event) {
     payload = payload.concat(CMD.SET_LINE_SPACING(100)); // Wide spacing for Double Height
 
     // Split paragraphs first to preserve intended structure
-    let paragraphs = cleanDesc.split('\n');
+    const paragraphs = cleanDesc.split('\n');
 
     paragraphs.forEach((paragraph) => {
-      let line = paragraph.trim();
+      const line = paragraph.trim();
       if (line.length === 0) return;
 
       // --- CHECKBOX LOGIC ---
       if (line.indexOf('[ ]') === 0) {
         // This is a checkbox line.
         // Strip the "[ ]" prefix to handle the text separately
-        let itemText = line.substring(3).trim();
+        const itemText = line.substring(3).trim();
 
         // Wrap the Item Text aggressively (30 chars) to account for the wide Checkbox
-        let wrappedLines = wrapText(itemText, 30);
+        const wrappedLines = wrapText(itemText, 30);
 
         wrappedLines.forEach((wLine, index) => {
           if (index === 0) {
@@ -213,7 +186,7 @@ function generateReceiptPayload(event) {
       } else {
         // --- STANDARD TEXT LOGIC ---
         // Just wrap to 42 chars and print Double Height
-        let wrappedLines = wrapText(line, 42);
+        const wrappedLines = wrapText(line, 42);
         wrappedLines.forEach((wLine) => {
           payload = payload.concat(CMD.SIZE_DOUBLE_HEIGHT);
           payload = payload.concat(stringToBytes(wLine + '\n'));
@@ -233,14 +206,17 @@ function generateReceiptPayload(event) {
 }
 
 // --- UTILITY: WORD WRAPPER ---
-function wrapText(text, maxChars) {
-  let resultLines = [];
+// This variant breaks words longer than maxChars; the briefing module has its
+// own (simpler) wrapText. They used to collide in Apps Script's shared global
+// scope; module scope now keeps each caller on its own — see CLAUDE.md.
+function wrapText(text: string, maxChars: number): string[] {
+  const resultLines: string[] = [];
   // Note: We only wrap single paragraphs here because the main loop handles \n splitting
-  let words = text.split(' ');
+  const words = text.split(' ');
   let currentLine = '';
 
   words.forEach((word) => {
-    let spaceNeeded = currentLine.length > 0 ? 1 : 0;
+    const spaceNeeded = currentLine.length > 0 ? 1 : 0;
     if (currentLine.length + spaceNeeded + word.length <= maxChars) {
       currentLine += (currentLine.length > 0 ? ' ' : '') + word;
     } else {
@@ -258,7 +234,8 @@ function wrapText(text, maxChars) {
 }
 
 // --- UTILITY: COMMUNICATIONS ---
-function sendToPi(byteArray) {
+// Shared transport: the single sink for every payload. Imported by the briefing.
+export function sendToPi(byteArray: number[]): boolean {
   if (!byteArray || !Array.isArray(byteArray) || byteArray.length === 0) {
     Logger.log('⚠️ Error: Payload is empty.');
     return false;
@@ -272,8 +249,8 @@ function sendToPi(byteArray) {
     .join(' ');
   Logger.log('📦 API PAYLOAD (HEX): ' + hexString);
 
-  var signedBytes = byteArray.map(function (b) {
-    var val = parseInt(b, 10);
+  const signedBytes = byteArray.map(function (b) {
+    const val = parseInt(b as unknown as string, 10);
     return val < 128 ? val : val - 256;
   });
 
@@ -285,7 +262,7 @@ function sendToPi(byteArray) {
 
   if (!USER || !PASS || !URL) throw new Error('Configuration Error');
 
-  const options = {
+  const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
     method: 'post',
     contentType: 'application/octet-stream',
     payload: blob,
@@ -300,13 +277,7 @@ function sendToPi(byteArray) {
   );
 }
 
-function stringToBytes(str) {
-  var bytes = [];
-  for (var i = 0; i < str.length; ++i) bytes.push(str.charCodeAt(i));
-  return bytes;
-}
-
-function callWithRetry(func) {
+function callWithRetry(func: () => boolean): boolean | undefined {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       if (func() === true) return true;
@@ -317,7 +288,7 @@ function callWithRetry(func) {
   }
 }
 
-function sendAlertEmail(subject, body) {
+function sendAlertEmail(subject: string, body: string): void {
   const scriptProperties = PropertiesService.getScriptProperties();
   const lastAlert = parseInt(scriptProperties.getProperty('LAST_ALERT_TIME') || '0');
   const now = new Date().getTime();
@@ -332,10 +303,15 @@ function sendAlertEmail(subject, body) {
 }
 
 // --- TEST SUITE ---
-function testPrinter() {
+export function testPrinter(): void {
   Logger.log('🧪 Starting Printer Test Suite...');
 
-  const createMock = (title, desc, isAllDay, hourOffset) => {
+  const createMock = (
+    title: string,
+    desc: string,
+    isAllDay: boolean,
+    hourOffset: number,
+  ): ReceiptEvent => {
     const t = new Date();
     t.setHours(t.getHours() + hourOffset);
     return {
