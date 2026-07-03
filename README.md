@@ -21,15 +21,14 @@ a Raspberry Pi Zero W that pipes bytes into the printer's USB port.
 ## How it works
 
 ```mermaid
-graph TD
-  A["Apps Script time trigger, daily"]
-  B["Context brief: date, season, local weather,<br/>the last 14 pieces"]
-  C["Claude Fable 5 designs the piece<br/>(a few web searches, optional)<br/>and returns a JSON art spec"]
-  D["Renderer: art spec to ESC/POS bytes<br/>CP437 blocks, box drawing, scaling,<br/>invert, gapless rows"]
-  E["POST octet-stream over ngrok<br/>(basic auth)"]
-  F["Pi Zero W: http.server writes<br/>raw bytes to /dev/usb/lp0"]
-  G["Epson TM-T20III prints and cuts"]
-  A --> B --> C --> D --> E --> F --> G
+graph LR
+  subgraph cloud["Google Apps Script · daily trigger"]
+    A(["daily brief"]) --> B["Fable designs<br/>an art spec"] --> C["render to<br/>ESC/POS"]
+  end
+  subgraph kitchen["the kitchen"]
+    D["Pi Zero W"] --> E(["Epson prints<br/>and cuts"])
+  end
+  C -- "POST · ngrok ·<br/>basic auth" --> D
 ```
 
 1. **Context.** `printDailyArt()` (`src/art.ts`) builds a small brief: today's
