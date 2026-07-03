@@ -11,8 +11,8 @@ npm run build      # tsc --noEmit + esbuild bundle -> dist/main.gs
 
 You don't need the printer or a Pi to work on most of this. `node
 test-print.mjs art --dry` renders the golden art spec through the real
-production renderer and prints the ESC/POS payload as hex — that's the
-fastest way to see the effect of a renderer change. With hardware, drop
+production renderer and prints the ESC/POS payload as hex, which is the
+fastest way to see what a renderer change does. With hardware, drop
 `--dry` and it prints (credentials go in `.env`; copy `.env.example`).
 
 ## Working with Claude Code
@@ -23,7 +23,7 @@ This repo is built for it. Start Claude Code in the repo root:
 claude
 ```
 
-It reads [`CLAUDE.md`](CLAUDE.md) automatically — the architecture, the deploy
+It reads [`CLAUDE.md`](CLAUDE.md) automatically: the architecture, the deploy
 ritual, and the gotchas that matter (byte-exact ESC/POS, the CP437 encoding
 rules, which functions must stay pure for the test harness). The repo also
 ships two skills in `.claude/skills/` that Claude Code picks up on its own:

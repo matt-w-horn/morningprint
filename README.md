@@ -20,17 +20,16 @@ a Raspberry Pi Zero W that pipes bytes into the printer's USB port.
 
 ## How it works
 
-```
-Apps Script time trigger (daily)
-  └─ assemble context: date, season, local weather,
-     the last 14 pieces (so today must differ)
-      └─ Claude Fable 5 (Anthropic API): designs the piece,
-         may run a few web searches, returns a JSON art spec
-          └─ renderer: art spec → ESC/POS bytes
-             (CP437 blocks, box drawing, scaling, invert, gapless rows)
-              └─ POST octet-stream over ngrok (basic auth)
-                  └─ Pi Zero W: http.server → /dev/usb/lp0
-                      └─ Epson TM-T20III prints and cuts
+```mermaid
+graph TD
+  A["Apps Script time trigger, daily"]
+  B["Context brief: date, season, local weather,<br/>the last 14 pieces"]
+  C["Claude Fable 5 designs the piece<br/>(a few web searches, optional)<br/>and returns a JSON art spec"]
+  D["Renderer: art spec to ESC/POS bytes<br/>CP437 blocks, box drawing, scaling,<br/>invert, gapless rows"]
+  E["POST octet-stream over ngrok<br/>(basic auth)"]
+  F["Pi Zero W: http.server writes<br/>raw bytes to /dev/usb/lp0"]
+  G["Epson TM-T20III prints and cuts"]
+  A --> B --> C --> D --> E --> F --> G
 ```
 
 1. **Context.** `printDailyArt()` (`src/art.ts`) builds a small brief: today's
@@ -38,9 +37,11 @@ Apps Script time trigger (daily)
    archive of the last 14 pieces (title + one-line style note each).
 2. **Design.** Claude gets a system prompt describing the medium — a 48-column
    monospace grid, 1-bit black, CP437 characters only — and is asked for one
-   committed idea that differs sharply from everything in the archive. It can
-   run a few web searches to feel out the day (holidays, headlines,
-   anniversaries). Structured output (a JSON schema) forces back a valid art
+   committed idea that differs sharply from everything in the archive. On a day
+   that genuinely earns it (a holiday after its eve, an event still unfolding,
+   a resonant anniversary) it may instead answer an earlier piece; the pair at
+   the top of this page is one of those. It can run a few web searches to feel
+   out the day. Structured output (a JSON schema) forces back a valid art
    spec: an array of styled text ops plus a short verse.
 3. **Render.** A ~50-line renderer turns ops into raw ESC/POS bytes. No
    drivers, no images — the art is literally text with style commands.
@@ -50,9 +51,9 @@ Apps Script time trigger (daily)
 
 ## The medium
 
-A receipt printer is a surprisingly good canvas precisely because it's so
-constrained: 203 dpi, one bit of color, 48 monospace columns, and a character
-set frozen in 1981. Everything the model can do, it does with CP437:
+A receipt printer is a surprisingly good canvas because it's so constrained:
+203 dpi, one bit of color, 48 monospace columns, and a character set frozen
+in 1981. Everything the model can do, it does with CP437:
 
 | Trick               | How                                                         |
 | ------------------- | ----------------------------------------------------------- |
@@ -67,8 +68,8 @@ set frozen in 1981. Everything the model can do, it does with CP437:
 The "seamless shapes" row is the trick that makes block art possible at all:
 by default the printer leaves a white seam between text lines, but `ESC 3`
 with the right value makes `░▒▓█` rows fuse into continuous fields. The value
-was calibrated empirically with a built-in test page — that, and every other
-byte this project sends, is documented in
+was calibrated empirically with a built-in test page. That page, and every
+other byte this project sends, is documented in
 [`docs/escpos-protocol.md`](docs/escpos-protocol.md).
 
 ## The art spec
@@ -82,6 +83,7 @@ executes. Abbreviated:
   "caption": "Test pattern: gradient, silhouette, invert, scale, texture.",
   "verse": "The mountains hold their breath;\nthe sun tries every shade of gray\nbefore committing to gold.",
   "style": "calibration plate; gradient + silhouette + type specimen",
+  "continues": "",
   "ops": [
     { "text": "░░░░…\n▒▒▒▒…\n▓▓▓▓…", "gapless": true },
     { "text": " DAWN ", "width": 2, "height": 2, "bold": true, "invert": true },
@@ -90,14 +92,20 @@ executes. Abbreviated:
 }
 ```
 
-Only the artwork and the verse are printed. `title`, `caption`, and `style`
-are archive fields: they land in the execution log and in a rolling
-`ART_HISTORY` property that is fed back into the next day's prompt —
-_"your recent pieces; today must differ sharply from all of these"_ — which is
-what keeps a daily generative loop from collapsing into the same sunset every
-morning. The prompt pushes rotation across the whole space: landscapes,
-geometric abstraction, pattern studies, giant-type posters, constellation
-maps, weather glyphs, emblems, diagrams.
+Only the artwork and the verse are printed. The rest are archive fields: they
+land in the execution log and in a rolling `ART_HISTORY` property that the
+next day's prompt receives as a list to differ from. That pressure keeps a
+daily generative loop from collapsing into the same sunset every morning, and
+the prompt pushes rotation across the whole space: landscapes, geometric
+abstraction, pattern studies, giant-type posters, constellation maps, weather
+glyphs, emblems, diagrams.
+
+`continues` is the deliberate exception. It stays empty almost every day, but
+when the day itself hands the model a thread (the Fourth of July arriving
+after its eve, an event still unfolding, a tenth anniversary), the model may
+build on one recent piece and record which. Those links show up as markers in
+the history it reads on later days, and a fresh marker raises the bar for the
+next one. That is what keeps continuations a surprise instead of a habit.
 
 The renderer treats the spec as untrusted: sizes are clamped, rows are
 truncated to the column budget, control characters are stripped, output is
@@ -151,7 +159,7 @@ npm run status     # list the files clasp would push (dry check)
 npm run push       # build, then clasp push (uploads dist/)
 ```
 
-The Apps Script web editor is a mirror, not a second source of truth — edit
+The Apps Script web editor is a mirror, not a second source of truth: edit
 locally and push. `npm run pull` fetches remote back down if the editor was
 touched directly.
 
@@ -174,12 +182,13 @@ No secrets live in the repo. Runtime config is read from **Script Properties**
 | `GEMINI_KEY`      | no       | Google API key for the Weather API              |
 | `LAT` / `LON`     | no       | location for weather context                    |
 
-Weather is garnish, not a dependency — without `GEMINI_KEY`/`LAT`/`LON` the
+Weather is garnish, not a dependency: without `GEMINI_KEY`/`LAT`/`LON` the
 art still prints, just uninformed about the sky.
 
 State keys managed by the script itself (no setup): `LAST_ART_DATE` (one art
-print per day), `ART_HISTORY` (the rolling archive fed back into the prompt),
-and `LAST_ALERT_TIME` (rate-limits alert emails).
+print per day), `ART_HISTORY` (the rolling archive fed back into the prompt,
+with markers on pieces that continued an earlier one), and `LAST_ALERT_TIME`
+(rate-limits alert emails).
 
 ### Trigger
 
