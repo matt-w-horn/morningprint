@@ -252,3 +252,10 @@ example/
 
 `npm run build` bundles `src/` into `dist/main.gs`; `clasp` uploads `dist/`
 (`.clasp.json` → `"rootDir": "dist"`). `dist/` is gitignored.
+
+## Provenance
+
+A personal project by Matt Horn, developed on personal time using personal
+equipment and personal accounts. Not affiliated with, sponsored by, or
+endorsed by Google, Anthropic, or any past or present employer. Views and
+content are my own. Copyright (c) 2026 Matt Horn. See [NOTICE](NOTICE).
