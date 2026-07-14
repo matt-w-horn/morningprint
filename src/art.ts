@@ -510,7 +510,7 @@ function generateDailyArt(apiKey: string, userContext: string): ArtSpec {
       contentType: 'application/json',
       headers: {
         'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
       },
       payload: JSON.stringify(body),
       muteHttpExceptions: true,
