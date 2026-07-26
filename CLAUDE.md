@@ -43,9 +43,8 @@ Script ID: `1TQHIiH25ZM-aMjmeSvsy4sWlR0VSWZwO1zLO2y6-EW1QbGo-LCBBaS1d`
 
 ## Deployment
 
-Push-first, always: the `apps-script-deploy` skill has the full ritual. The
-short version: ask the user to close any open Apps Script editor tabs (a stale
-editor session has silently saved old code over a fresh push, twice), then
+Push-first, always: ask the user to close any open Apps Script editor tabs (a
+stale editor session has silently saved old code over a fresh push, twice), then
 `npm run push`, then verify in a **fresh** tab via `npx clasp open-script`,
 never in a tab that was already open. If the remote looks stale, re-push once;
 if it reverts again, hunt down the open editor session instead of pushing a
