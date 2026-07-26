@@ -11,6 +11,9 @@ dist/
 # Local test credentials (copy .env.example -> .env)
 .env
 
+# Real Pi/ngrok secrets & pulled live configs — never committed (see pi/README.md)
+private/
+
 # Logs / OS cruft
 *.log
 .DS_Store

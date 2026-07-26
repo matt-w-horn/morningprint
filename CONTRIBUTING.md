@@ -25,10 +25,8 @@ claude
 
 It reads [`CLAUDE.md`](CLAUDE.md) automatically: the architecture, the deploy
 ritual, and the gotchas that matter (byte-exact ESC/POS, the CP437 encoding
-rules, which functions must stay pure for the test harness). The repo also
-ships two skills in `.claude/skills/` that Claude Code picks up on its own:
-the Apps Script deploy ritual and a prose style guide for docs. No install
-step for any of it. A good first prompt:
+rules, which functions must stay pure for the test harness). No install step
+for any of it. A good first prompt:
 
 > Read CLAUDE.md and docs/escpos-protocol.md, then walk me through how an art
 > spec becomes bytes on paper. Use `node test-print.mjs art --dry` to show me.
