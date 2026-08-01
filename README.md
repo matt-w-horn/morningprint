@@ -1,5 +1,8 @@
 # morningprint
 
+[![ci](https://github.com/matt-w-horn/morningprint/actions/workflows/ci.yml/badge.svg)](https://github.com/matt-w-horn/morningprint/actions/workflows/ci.yml)
+![license: MIT](https://img.shields.io/badge/license-MIT-blue)
+
 One original print, every morning.
 
 A thermal receipt printer in my kitchen wakes up each day and prints a piece
