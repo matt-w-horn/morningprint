@@ -130,8 +130,10 @@ payload without printing.
   `output_config.format` (json_schema); web search is a server tool
   (`web_search_20260209`, basic `20250305` fallback) and can return
   `stop_reason: "pause_turn"`; the client loop echoes the assistant content
-  back to resume. A refusal fallback to `claude-opus-4-8` is enabled via the
-  `server-side-fallback-2026-06-01` beta header.
+  back to resume. The `server-side-fallback-2026-06-01` beta header (refusal
+  fallback to `claude-opus-4-8`) is sent only by the local harness
+  `test-print.mjs`; the production request in `src/art.ts` does not send it, so
+  a production refusal throws and lands in the alert email.
 - **`encodeCP437` for all printed text.** It maps Unicode block/box/symbol
   characters to CP437 bytes, drops control characters (they'd be interpreted
   as printer commands), and prints `?` for anything unmapped.

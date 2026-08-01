@@ -3,7 +3,7 @@
 One original print, every morning.
 
 A thermal receipt printer in my kitchen wakes up each day and prints a piece
-of character art that has never existed before, designed seconds earlier by
+of character art that has never existed before, designed minutes earlier by
 Claude, themed to the day: the weather outside, the season, whatever the news
 feels like. A short verse underneath. One physical copy, 80mm wide, and that
 is the whole broadcast.
@@ -12,10 +12,8 @@ is the whole broadcast.
   <img src="example/example_2.jpeg" width="800" alt="Two thermal receipts pinned side by side on a corkboard. Left, dated Friday July 3 2026: a lone firework rocket climbs a dotted trail through a sparse starfield above a solid-black skyline; the verse reads 'July third, the eve; one scout rocket up early, testing the dark. Tomorrow, the whole sky.' Right, dated Saturday July 4 2026: the same skyline under a sky full of firework bursts; the verse reads 'The scout kept its word. Every dark inch answers at once: blooms, rings, embers walking down to the same small town, upturned.'">
 </p>
 
-Two mornings, a day apart. On July 3 the printer sent up one scout rocket to
-test the dark, and the verse promised "tomorrow, the whole sky." On the Fourth
-it kept the word: the same skyline under a sky full of bursts. Most days stand
-on their own. Once in a while a piece answers the one before it.
+Two mornings, a day apart. Most days stand on their own; once in a while a
+piece answers the one before it, the way July 4 answered July 3 above.
 
 This started as a bet against my phone. The first minutes of the day kept
 going to feeds, so I pointed the same inputs at a printer instead. It reads
@@ -24,15 +22,16 @@ finished thing you can hold. There is nothing to refresh and nothing to
 scroll; when the cutter drops, the day's edition is out. Yesterday's goes up
 on the corkboard.
 
-The whole thing is a Google Apps Script. There is no server to maintain beyond
-a Raspberry Pi Zero W that pipes bytes into the printer's USB port.
+The cloud half is a single Google Apps Script. The only hardware on my side is
+a Raspberry Pi Zero W running a small Python bridge (systemd plus an ngrok
+tunnel; runbook in `docs/`) that pipes bytes into the printer's USB port.
 
 ## How it works
 
 ```mermaid
 graph LR
   subgraph cloud["Google Apps Script · daily trigger"]
-    A(["daily brief"]) --> B["Fable designs<br/>an art spec"] --> C["render to<br/>ESC/POS"]
+    A(["daily brief"]) --> B["Claude designs<br/>an art spec"] --> C["render to<br/>ESC/POS"]
   end
   subgraph kitchen["the kitchen"]
     D["Pi Zero W"] --> E(["Epson prints<br/>and cuts"])
@@ -44,24 +43,24 @@ graph LR
    date, the season, current weather from the Google Weather API, and a rolling
    archive of the last 14 pieces (title + one-line style note each).
 2. **Design.** Claude gets a system prompt describing the medium (a 48-column
-   monospace grid, 1-bit black, CP437 characters only) and is asked for one
+   monospace grid, 1-bit black, only CP437, the old IBM PC character set) and is asked for one
    committed idea that differs sharply from everything in the archive. On a day
    that genuinely earns it (a holiday after its eve, an event still unfolding,
    a resonant anniversary) it may instead answer an earlier piece; the pair at
    the top of this page is one of those. It can run a few web searches to feel
    out the day. Structured output (a JSON schema) forces back a valid art
    spec: an array of styled text ops plus a short verse.
-3. **Render.** A ~50-line renderer turns ops into raw ESC/POS bytes. No
-   drivers, no images: the art is literally text with style commands.
+3. **Render.** A ~50-line renderer turns ops into raw ESC/POS bytes (ESC/POS
+   is the byte-level command language receipt printers speak). No drivers, no
+   images: the art is literally text with style commands.
 4. **Print.** The bytes are POSTed to the Pi, which writes them to the
    printer's character device. The receipt prints: a small date stamp, the
    artwork, the verse. Nothing else: no title, no branding.
 
 ## The medium
 
-A receipt printer is a surprisingly good canvas because it's so constrained:
-203 dpi, one bit of color, 48 monospace columns, and a character set frozen
-in 1981. Everything the model can do, it does with CP437:
+The canvas: 203 dpi, one bit of color, 48 monospace columns, and a character
+set frozen in 1981. Everything the model can do, it does with CP437:
 
 | Trick               | How                                                         |
 | ------------------- | ----------------------------------------------------------- |
@@ -100,9 +99,10 @@ executes. Abbreviated:
 }
 ```
 
-Only the artwork and the verse are printed. The rest are archive fields: they
-land in the execution log and in a rolling `ART_HISTORY` property that the
-next day's prompt receives as a list to differ from. That pressure keeps a
+Only the artwork and the verse are printed. The rest are archive fields: the
+title and style land in a rolling `ART_HISTORY` property that the next day's
+prompt receives as a list to differ from; the caption goes to the execution
+log only. That pressure keeps a
 daily generative loop from collapsing into the same sunset every morning, and
 the prompt pushes rotation across the whole space: landscapes, geometric
 abstraction, pattern studies, giant-type posters, constellation maps, weather
@@ -121,10 +121,11 @@ capped at 150 rows (~45cm of paper), and anything CP437 can't print becomes a
 visible-but-harmless `?`.
 
 A few API notes, for the curious: the art spec comes back via structured
-output (`output_config.format` with a JSON schema); web search runs as a
-server-side tool, so the client just resumes on `stop_reason: "pause_turn"`;
-and a server-side fallback re-serves the request with another model in the
-unlikely event of a refusal. Details in `CLAUDE.md`.
+output (`output_config.format` with a JSON schema), and web search runs as a
+server-side tool, so the client just resumes on `stop_reason: "pause_turn"`.
+The local harness enables the server-side fallback beta (another model
+re-serves a refused request); the production path does not, so a refusal there
+fails loudly to the alert email. Details in `CLAUDE.md`.
 
 ## Hardware
 
@@ -133,7 +134,9 @@ unlikely event of a refusal. Details in `CLAUDE.md`.
   recalibrating the column constants (`node test-print.mjs ruler`).
 - **Bridge:** Raspberry Pi Zero W running a ~40-line Python `http.server`
   that writes request bodies straight to `/dev/usb/lp0`, exposed through an
-  ngrok static domain with basic auth, kept alive by systemd.
+  ngrok static domain with basic auth, kept alive by systemd. The script
+  itself lives on the Pi and is not committed here; its whole contract is
+  "write each POST body to `/dev/usb/lp0`", and the runbook covers the rest.
 
 <p align="center">
   <img src="example/example_1.jpeg" width="360" alt="The Epson TM-T20III thermal printer with a receipt curling from its slot. The print shows a large solid-black Liberty Bell with a jagged crack down the middle, the line '1776 - 2026', and the verse 'Two hundred fifty summers rung. The crack is where the sound gets out, imperfect, loud, and still begun.'">
@@ -145,16 +148,12 @@ and calibration results) is specced in
 maintenance, troubleshooting, and disaster recovery live in
 [`docs/pi-print-server-runbook.md`](docs/pi-print-server-runbook.md).
 
-## Contributing
-
-Clone the repo, `npm install`, and start [Claude Code](https://claude.com/claude-code)
-in the root; it picks up [`CLAUDE.md`](CLAUDE.md) automatically, which carries
-the architecture, the deploy ritual, and the byte-level gotchas. You can iterate
-on the renderer with no hardware at all: `node test-print.mjs art --dry` shows
-the exact ESC/POS bytes a change produces. The longer version, including a good
-first prompt to hand Claude, is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
 ## Run your own
+
+You need four things: an ESC/POS printer, something that can pipe bytes to its
+USB port (here, a Pi Zero W; see [Hardware](#hardware) and the
+[runbook](docs/pi-print-server-runbook.md)), an ngrok static domain, and an
+Anthropic API key.
 
 TypeScript under `src/` is the source of truth; esbuild bundles it to a single
 `dist/main.gs`, which [`clasp`](https://github.com/google/clasp) pushes to Apps
@@ -172,8 +171,9 @@ locally and push. `npm run pull` fetches remote back down if the editor was
 touched directly.
 
 First-time setup on a new machine: `npx clasp login` (writes `~/.clasprc.json`),
-then `npm run push`. The project is already bound via the committed
-`.clasp.json`.
+then `npm run push`. The committed `.clasp.json` binds to my script; for your
+own deployment, run `npx clasp create --type standalone --rootDir dist` (or put
+your own `scriptId` in `.clasp.json`) before the first push.
 
 ### Configuration
 
@@ -200,8 +200,8 @@ with markers on pieces that continued an earlier one), and `LAST_ALERT_TIME`
 
 ### Trigger
 
-One time-driven trigger on `printDailyArt` (Apps Script editor → Triggers). A
-morning hour works well. An hourly trigger is also safe: `LAST_ART_DATE`
+Create one time-driven trigger on `printDailyArt` (Apps Script editor →
+Triggers). A morning hour works well. An hourly trigger is also safe: `LAST_ART_DATE`
 limits it to one print per day, and because the guard is only set on success,
 extra runs double as retries after a failure.
 
@@ -227,8 +227,17 @@ node test-print.mjs art:live    # LIVE end-to-end art (ANTHROPIC_KEY in .env)
 node test-print.mjs art --dry   # print the hex payload instead of sending
 ```
 
-`.env` is gitignored; credentials never live in the repo. This script is local
-only; it isn't bundled into `dist/` or pushed to Apps Script.
+This script is local only; it isn't bundled into `dist/` or pushed to Apps
+Script.
+
+## Contributing
+
+Clone the repo, `npm install`, and start [Claude Code](https://claude.com/claude-code)
+in the root; it picks up [`CLAUDE.md`](CLAUDE.md) automatically, which carries
+the architecture, the deploy ritual, and the byte-level gotchas. You can iterate
+on the renderer with no hardware at all: `node test-print.mjs art --dry` shows
+the exact ESC/POS bytes a change produces. The longer version, including a good
+first prompt to hand Claude, is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Layout
 
@@ -250,12 +259,13 @@ example/
   example_2.jpeg             the Jul 3 -> Jul 4 sequence, pinned side by side
 ```
 
-`npm run build` bundles `src/` into `dist/main.gs`; `clasp` uploads `dist/`
-(`.clasp.json` → `"rootDir": "dist"`). `dist/` is gitignored.
+`clasp` uploads only `dist/` (`.clasp.json` → `"rootDir": "dist"`), which is
+gitignored.
 
 ## Provenance
 
 A personal project by Matt Horn, developed on personal time using personal
 equipment and personal accounts. Not affiliated with, sponsored by, or
 endorsed by Google, Anthropic, or any past or present employer. Views and
-content are my own. Copyright (c) 2026 Matt Horn. See [NOTICE](NOTICE).
+content are my own. Copyright (c) 2026 Matt Horn. MIT-licensed; see
+[LICENSE](LICENSE) and [NOTICE](NOTICE).
