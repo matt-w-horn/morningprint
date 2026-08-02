@@ -64,6 +64,24 @@ export interface ArtHistoryEntry {
 
 const HISTORY_LIMIT = 14;
 
+// Bounds on model output. These are the limits the schema and system prompt
+// already describe (title <=20 chars, verse 2-6 lines of <=COLS_A, art capped at
+// MAX_ROWS); structured outputs can't enforce lengths, so they are enforced here
+// with slack. On 2026-07-27 a run degenerated into a repeating filler loop and
+// wrote several kilobytes of it into `title`. That entry was persisted to
+// ART_HISTORY and replayed into every later prompt, which taught the model to
+// reproduce the loop: by 2026-08-02 the receipt was a page of the model talking
+// to itself. Model output is untrusted input, so it gets bounded on the way in
+// and on the way back out of storage.
+// Calibrated against the 2026-07-19..26 entries still in ART_HISTORY: titles
+// ran to 19 chars and style notes to 277, while the poisoned title was 3155.
+// The gap is wide, so these sit well clear of real output. Tightening
+// MAX_STYLE_LEN to 200 would discard four of those seven genuine entries.
+const MAX_TITLE_LEN = 40;
+const MAX_STYLE_LEN = 600;
+const MAX_VERSE_LEN = 500; // 6 lines * COLS_A is 288; this is ~1.7x
+const MAX_OP_TEXT_LEN = 10000; // MAX_ROWS * COLS_B is 9600
+
 // Continuity is model-judged, not code-rolled: the prompt lets the model
 // continue a recent piece when the day genuinely warrants it (a holiday
 // following its eve, a multi-day event, an anniversary). The spec's
@@ -319,6 +337,60 @@ export function parseArtResponse(res: {
       ? spec.continues.trim()
       : '';
   return spec;
+}
+
+// Reject a spec whose fields have run past the bounds the schema describes.
+// A degenerate generation doesn't fail cleanly: it returns valid JSON whose
+// strings hold the model's own repeated filler, which parseArtResponse's shape
+// check happily accepts. Throwing here keeps that off the paper and out of
+// ART_HISTORY. printDailyArt's catch emails the alert and leaves LAST_ART_DATE
+// unset, so the next trigger regenerates from scratch.
+export function validateArtSpec(spec: ArtSpec): void {
+  const tooLong = (s: unknown, max: number): boolean =>
+    typeof s === 'string' && s.length > max;
+
+  if (tooLong(spec.title, MAX_TITLE_LEN))
+    throw new Error(
+      `Art spec rejected: title is ${spec.title.length} chars (max ${MAX_TITLE_LEN})`,
+    );
+  if (tooLong(spec.style, MAX_STYLE_LEN))
+    throw new Error(
+      `Art spec rejected: style is ${spec.style.length} chars (max ${MAX_STYLE_LEN})`,
+    );
+
+  // The verse is the only text printed with the piece, so an empty or runaway
+  // one means the model lost the plot even if the ops look plausible.
+  const verse = String(spec.verse || '').trim();
+  if (verse.length === 0) throw new Error('Art spec rejected: verse is empty');
+  if (verse.length > MAX_VERSE_LEN)
+    throw new Error(
+      `Art spec rejected: verse is ${verse.length} chars (max ${MAX_VERSE_LEN})`,
+    );
+
+  spec.ops.forEach((op, i) => {
+    if (tooLong(op.text, MAX_OP_TEXT_LEN))
+      throw new Error(
+        `Art spec rejected: ops[${i}].text is ${String(op.text).length} chars (max ${MAX_OP_TEXT_LEN})`,
+      );
+  });
+}
+
+// Drop history entries that don't look like a logged piece. Applied on read, so
+// a history already carrying a poisoned entry heals itself on the next run
+// without anyone editing the Script Property by hand.
+export function sanitizeArtHistory(entries: unknown): ArtHistoryEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((e): e is ArtHistoryEntry => {
+    if (!e || typeof e !== 'object') return false;
+    const { d, title, style, c } = e as ArtHistoryEntry;
+    if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+    if (typeof title !== 'string' || title.length === 0 || title.length > MAX_TITLE_LEN)
+      return false;
+    if (typeof style !== 'string' || style.length > MAX_STYLE_LEN) return false;
+    if (c !== undefined && (typeof c !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(c)))
+      return false;
+    return true;
+  });
 }
 
 // --- RENDERER ---
@@ -593,10 +665,21 @@ export function printDailyArt(): void {
       }
     }
 
-    // Recent pieces feed the prompt so consecutive days differ.
+    // Recent pieces feed the prompt so consecutive days differ. Whatever is in
+    // storage goes straight into the prompt, so it is sanitized first and the
+    // cleaned version written back: a poisoned entry is dropped once, here,
+    // rather than replayed for the next fourteen days.
     let history: ArtHistoryEntry[] = [];
     try {
-      history = JSON.parse(props.getProperty('ART_HISTORY') || '[]');
+      const raw = JSON.parse(props.getProperty('ART_HISTORY') || '[]');
+      history = sanitizeArtHistory(raw);
+      const dropped = (Array.isArray(raw) ? raw.length : 0) - history.length;
+      if (dropped > 0) {
+        Logger.log(
+          `🧹 Dropped ${dropped} malformed ART_HISTORY entr${dropped === 1 ? 'y' : 'ies'}`,
+        );
+        props.setProperty('ART_HISTORY', JSON.stringify(history));
+      }
     } catch (e) {
       Logger.log('⚠️ ART_HISTORY unreadable, starting fresh');
     }
@@ -605,6 +688,7 @@ export function printDailyArt(): void {
     Logger.log('🖼️ Context:\n' + context);
 
     const spec = generateDailyArt(apiKey, context);
+    validateArtSpec(spec); // before the log lines: a degenerate title is megabytes
     Logger.log(`🎨 "${spec.title}" — ${spec.caption || ''}`);
     Logger.log(`🗂️ ${spec.ops.length} ops — ${spec.style || ''}`);
 

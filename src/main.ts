@@ -14,5 +14,7 @@ export {
   buildArtContext,
   buildArtRequestBody,
   parseArtResponse,
+  validateArtSpec,
+  sanitizeArtHistory,
   GOLDEN_ART_SPEC,
 } from './art';
