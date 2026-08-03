@@ -123,6 +123,17 @@ truncated to the column budget, control characters are stripped, output is
 capped at 150 rows (~45cm of paper), and anything CP437 can't print becomes a
 visible-but-harmless `?`.
 
+Structured output guarantees the shape of the JSON, not the size of the
+strings inside it, and one run in July 2026 found that gap: valid JSON with a
+3,155-character title of repeated filler. The archive saved it, every later
+prompt replayed it, and the model learned its own loop; within a week the
+receipt was a page of the model talking to itself instead of artwork. Specs
+are now checked against the length bounds the schema describes before
+anything is printed or written to the archive; a rejected spec throws to the
+alert email, and the next trigger retries. The archive is sanitized on read
+too, so an already poisoned entry is dropped once instead of fed back for
+fourteen days.
+
 A few API notes, for the curious: the art spec comes back via structured
 output (`output_config.format` with a JSON schema), and web search runs as a
 server-side tool, so the client just resumes on `stop_reason: "pause_turn"`.
