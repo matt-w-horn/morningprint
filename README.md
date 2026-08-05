@@ -20,10 +20,10 @@ piece answers the one before it, the way July 4 answered July 3 above.
 
 This started as a bet against my phone. The first minutes of the day kept
 going to feeds, so I pointed the same inputs at a printer instead. It reads
-what the feeds read (headlines, forecasts, anniversaries) and hands back one
-finished thing you can hold. There is nothing to refresh and nothing to
-scroll; when the cutter drops, the day's edition is out. Yesterday's goes up
-on the corkboard.
+what the feeds read (forecasts, anniversaries, and the day's headlines when it
+goes looking for them) and hands back one finished thing you can hold. There
+is nothing to refresh; when the cutter drops, the day's edition is out.
+Yesterday's goes up on the corkboard.
 
 The cloud half is a single Google Apps Script. The only hardware on my side is
 a Raspberry Pi Zero W running a small Python bridge (systemd plus an ngrok
@@ -51,8 +51,8 @@ graph LR
    that genuinely earns it (a holiday after its eve, an event still unfolding,
    a resonant anniversary) it may instead answer an earlier piece; the pair at
    the top of this page is one of those. It can run a few web searches to feel
-   out the day. Structured output (a JSON schema) forces back a valid art
-   spec: an array of styled text ops plus a short verse.
+   out the day. Structured output (a JSON schema) constrains the reply to an
+   art spec: an array of styled text ops plus a short verse.
 3. **Render.** A ~50-line renderer turns ops into raw ESC/POS bytes (ESC/POS
    is the byte-level command language receipt printers speak). No drivers, no
    images: the art is literally text with style commands.
@@ -164,10 +164,10 @@ maintenance, troubleshooting, and disaster recovery live in
 
 ## Run your own
 
-You need four things: an ESC/POS printer, something that can pipe bytes to its
-USB port (here, a Pi Zero W; see [Hardware](#hardware) and the
-[runbook](docs/pi-print-server-runbook.md)), an ngrok static domain, and an
-Anthropic API key.
+You need an ESC/POS printer, something that can pipe bytes to its USB port
+(here, a Pi Zero W; see [Hardware](#hardware) and the
+[runbook](docs/pi-print-server-runbook.md)), an ngrok static domain, an
+Anthropic API key, a Google account for Apps Script, and Node for the build.
 
 TypeScript under `src/` is the source of truth; esbuild bundles it to a single
 `dist/main.gs`, which [`clasp`](https://github.com/google/clasp) pushes to Apps
