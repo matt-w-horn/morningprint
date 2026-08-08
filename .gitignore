@@ -5,15 +5,20 @@ node_modules/
 dist/
 
 # clasp credentials — never commit. (.clasp.json IS committed here, on purpose:
-# it holds only the scriptId + push config, no secrets — see CLAUDE.md.)
+# it holds only the scriptId + push config, no secrets.)
 .clasprc.json
 
-# Local test credentials (copy .env.example -> .env)
-.env
+# Real Pi/ngrok secrets and pulled live configs (see pi/README.md)
+/private/
 
-# Real Pi/ngrok secrets & pulled live configs — never committed (see pi/README.md)
-private/
-
-# Logs / OS cruft
+# Logs
 *.log
-.DS_Store
+
+# Secrets and local credentials (.env.example stays tracked).
+.env
+.env.*
+!.env.example
+
+# Claude Code working files (also global; repeated so clones get it too).
+.claude/
+CLAUDE.md
