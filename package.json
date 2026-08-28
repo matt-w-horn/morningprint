@@ -15,7 +15,7 @@
     "pull": "clasp pull"
   },
   "devDependencies": {
-    "@google/clasp": "^3.3.0",
+    "@google/clasp": "^3.4.0",
     "@types/google-apps-script": "^2.0.12",
     "esbuild": "^0.28.2",
     "prettier": "^3.9.6",
