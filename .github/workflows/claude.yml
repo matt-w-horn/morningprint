@@ -25,6 +25,11 @@ jobs:
        (github.event_name != 'issues' && contains(github.event.comment.body, '@claude') &&
         github.event.comment.author_association == 'OWNER'))
     runs-on: ubuntu-latest
+    # Caps what one run can spend, and runs one job at a time per issue or
+    # pull request, so a burst of comments cannot start many paid runs.
+    timeout-minutes: 60
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
     permissions:
       contents: write
       pull-requests: write

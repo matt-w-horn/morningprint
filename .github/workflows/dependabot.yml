@@ -19,9 +19,18 @@ permissions:
 
 jobs:
   dependabot-review:
-    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
+    # Dependabot opened it, Dependabot pushed this commit, and the branch is in
+    # this repository, not a fork.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # A newer push to the same pull request replaces the running review.
+    concurrency:
+      group: dependabot-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: write
       pull-requests: write
@@ -69,6 +78,7 @@ jobs:
             If you are unsure, it is not safe.
           claude_args: >-
             --model claude-opus-5-5
+            --max-turns 30
             --allowedTools "Bash(git diff:*),Bash(git log:*),Read,Grep,Glob"
             --json-schema '{"type":"object","properties":{"safe":{"type":"boolean"},"summary":{"type":"string","description":"Two to five plain sentences: what changed and why it is or is not safe."}},"required":["safe","summary"]}'
       - name: Comment the verdict
