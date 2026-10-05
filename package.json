@@ -18,7 +18,7 @@
     "@google/clasp": "^3.4.0",
     "@types/google-apps-script": "^2.0.13",
     "esbuild": "^0.28.2",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.9",
     "typescript": "^7.0.2"
   },
   "overrides": {
