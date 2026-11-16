@@ -45,7 +45,7 @@ jobs:
         with:
           node-version: '26'
       - run: npm ci
-      - uses: anthropics/claude-code-action@4845bacbb38b3c4b15d948f035349786f678e068 # v1
+      - uses: anthropics/claude-code-action@4fa93a88de49bbef68b10eb15aabedf28ca0e1ed # v1
         with:
           # Workload identity federation: the action trades the job's GitHub OIDC
           # token for a short-lived Claude API token, so no key is stored here.
